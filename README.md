@@ -12,7 +12,7 @@ A production-ready cyber threat intelligence platform for monitoring dark web th
 - **Scalable Architecture** — Docker Compose microservices with Celery task queues, Redis caching, PostgreSQL + MongoDB storage
 - **Role-Based Access Control** — Multi-user support with admin, analyst, and viewer roles
 - **Source Credential Encryption** — Fernet-encrypted storage for authenticated source credentials
-- **Dark Web Anonymity** — All dark web traffic routed through Tor with automatic circuit rotation
+- **Dark Web Anonymity** — All dark web traffic routed through Tor with automatic circuit rotation.
 
 ## Screenshots
 
