@@ -17,3 +17,12 @@ backend.log
 dwtip.db
 docker-data/
 *.sqlite3
+*.db
+*.log
+backend.log
+frontend.log
+nightwatch.db
+nightwatch_*.db
+frontend/dist/
+backend/logs/
+logs/

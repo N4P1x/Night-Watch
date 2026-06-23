@@ -1,0 +1,2 @@
+export const POLL_INTERVAL = 30000
+export const SCRAPE_POLL_INTERVAL = 3000
