@@ -7,7 +7,14 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-PYTHON="$SCRIPT_DIR/backend/venv/bin/python"
+PYTHON="${PYTHON:-python3}"
+
+# Check for virtual environments
+if [ -f "$SCRIPT_DIR/backend/venv/bin/python" ]; then
+    PYTHON="$SCRIPT_DIR/backend/venv/bin/python"
+elif [ -d "$SCRIPT_DIR/venv" ] && [ -f "$SCRIPT_DIR/venv/bin/python" ]; then
+    PYTHON="$SCRIPT_DIR/venv/bin/python"
+fi
 
 echo "[*] Starting NightWatch..."
 

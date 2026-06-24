@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     celery_result_backend: str = ""
 
     deepdarkcti_path: str = ""
+    fernet_key: str = ""
 
     class Config:
         env_file = ".env"

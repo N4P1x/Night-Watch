@@ -83,6 +83,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile.api
     container_name: dwtip-backend
+    command: uvicorn backend.api.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     environment:
@@ -95,6 +96,7 @@ services:
       - DEEPDARKCTI_PATH=/app/deepdarkCTI
       - DWTIP_ROOT=/app
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
+      - PYTHONPATH=/app
     volumes:
       - ./backend:/app/backend:ro
       - ./deepdarkCTI:/app/deepdarkCTI:ro
@@ -202,8 +204,8 @@ services:
 
   scraper:
     build:
-      context: ./scripts
-      dockerfile: ../backend/Dockerfile.scraper
+      context: .
+      dockerfile: backend/Dockerfile.scraper
     container_name: dwtip-scraper
     command: python advanced_scraper.py 100 --workers 4
     environment:

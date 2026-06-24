@@ -46,9 +46,9 @@ app.conf.task_default_exchange = "default"
 app.conf.task_default_routing_key = "default"
 
 app.conf.task_routes = {
-    "backend.workers.tasks.scrape_*": {"queue": "scraping"},
-    "backend.workers.tasks.alert_*": {"queue": "alerts"},
-    "backend.workers.tasks.process_*": {"queue": "processing"},
+    "workers.tasks.scrape_*": {"queue": "scraping"},
+    "workers.tasks.alert_*": {"queue": "alerts"},
+    "workers.tasks.process_*": {"queue": "processing"},
 }
 
 app.conf.beat_schedule = {

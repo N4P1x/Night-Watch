@@ -14,6 +14,9 @@ check_command() {
     return 0
 }
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$SCRIPT_DIR"
+
 install_deps_arch() {
     echo "[*] Installing system dependencies (Arch Linux)..."
     sudo pacman -Sy --noconfirm \
@@ -24,10 +27,10 @@ install_deps_arch() {
     
     echo "[*] Installing Python dependencies..."
     pip install --upgrade pip
-    pip install -r dwtip/backend/requirements.txt
+    pip install -r "$PROJECT_ROOT/backend/requirements.txt"
     
     echo "[*] Installing Node.js dependencies..."
-    cd dwtip/frontend && npm install && cd ../..
+    cd "$PROJECT_ROOT/frontend" && npm install && cd "$PROJECT_ROOT"
 }
 
 install_deps_ubuntu() {
@@ -41,10 +44,10 @@ install_deps_ubuntu() {
     
     echo "[*] Installing Python dependencies..."
     pip3 install --upgrade pip
-    pip3 install -r dwtip/backend/requirements.txt
+    pip3 install -r "$PROJECT_ROOT/backend/requirements.txt"
     
     echo "[*] Installing Node.js dependencies..."
-    cd dwtip/frontend && npm install && cd ../..
+    cd "$PROJECT_ROOT/frontend" && npm install && cd "$PROJECT_ROOT"
 }
 
 install_docker() {
@@ -110,15 +113,15 @@ setup_databases() {
 setup_env() {
     echo "[*] Setting up environment variables..."
     
-    if [ ! -f .env ]; then
-        cp config/.env.example .env
-        echo "[!] Please edit dwtip/.env with your configuration"
+    if [ ! -f "$PROJECT_ROOT/.env" ]; then
+        cp "$PROJECT_ROOT/.env.example" "$PROJECT_ROOT/.env"
+        echo "[!] Please edit $PROJECT_ROOT/.env with your configuration"
     fi
 }
 
 init_database_schemas() {
     echo "[*] Initializing database schemas..."
-    cd dwtip
+    cd "$PROJECT_ROOT"
     python3 -c "
 from backend.core.database import init_postgresql, init_mongodb
 import asyncio
@@ -126,14 +129,13 @@ asyncio.run(init_postgresql())
 asyncio.run(init_mongodb())
 print('[+] Database schemas initialized')
 "
-    cd ..
 }
 
 build_frontend() {
     echo "[*] Building frontend..."
-    cd dwtip/frontend
+    cd "$PROJECT_ROOT/frontend"
     npm run build
-    cd ..
+    cd "$PROJECT_ROOT"
 }
 
 print_success() {
@@ -143,11 +145,11 @@ print_success() {
     echo "========================================="
     echo ""
     echo "Next steps:"
-    echo "  1. Edit dwtip/.env with your configuration"
-    echo "  2. Run: cd dwtip && docker-compose up -d"
+    echo "  1. Edit .env with your configuration"
+    echo "  2. Run: cd \"$PROJECT_ROOT\" && docker-compose up -d"
     echo "  3. Or run manually:"
-    echo "     - cd dwtip/backend && uvicorn api.main:app --reload"
-    echo "     - cd dwtip/frontend && npm start"
+    echo "     - cd \"$PROJECT_ROOT/backend\" && uvicorn api.main:app --reload"
+    echo "     - cd \"$PROJECT_ROOT/frontend\" && npm start"
     echo ""
     echo "Default credentials:"
     echo "  API: http://localhost:8000"

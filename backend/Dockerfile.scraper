@@ -19,4 +19,4 @@ RUN playwright install chromium
 
 COPY backend/ .
 
-CMD ["python", "-m", "scrapers.runner"]
+CMD ["python", "scripts/advanced_scraper.py"]

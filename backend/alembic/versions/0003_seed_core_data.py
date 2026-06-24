@@ -53,13 +53,14 @@ def upgrade() -> None:
     for a in actors:
         conn.execute(
             sa.text("""
-                INSERT OR IGNORE INTO threat_actors
+                INSERT INTO threat_actors
                     (name, aliases, description, motivation, sophistication, resource_level,
                      target_industries, target_regions, ttps, associated_malware, risk_level, is_active,
                      created_at, updated_at, first_seen, last_activity)
                 VALUES (:name, :aliases, :description, :motivation, :sophistication, :resource_level,
                         :target_industries, :target_regions, :ttps, :associated_malware, :risk_level, :is_active,
                         :created_at, :updated_at, :first_seen, :last_activity)
+                ON CONFLICT (name) DO NOTHING
             """),
             {
                 "name": a[0], "aliases": a[1], "description": a[2], "motivation": a[3],
@@ -143,11 +144,12 @@ def upgrade() -> None:
         name, stype, url, onion_url, lang, active, is_onion, uses_tor, interval, reliability = s
         conn.execute(
             sa.text("""
-                INSERT OR IGNORE INTO sources
+                INSERT INTO sources
                     (name, type, url, onion_url, language, is_active, is_onion, uses_tor,
                      scrape_interval_minutes, reliability_score, created_at, updated_at)
                 VALUES (:name, :type, :url, :onion_url, :language, :is_active, :is_onion, :uses_tor,
                         :scrape_interval_minutes, :reliability_score, :created_at, :updated_at)
+                ON CONFLICT (name) DO NOTHING
             """),
             {
                 "name": name, "type": stype, "url": url, "onion_url": onion_url,

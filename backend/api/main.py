@@ -854,14 +854,6 @@ async def trigger_scrape(
     db: Session = Depends(get_db),
 ):
     import os
-    # Get the parent directory of 'api' which is the backend root
-    base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    # But scripts is outside backend root? Let's check. 
-    # Structure:
-    # /app/api/main.py
-    # /app/scripts/scrape_tor.py? No, it's in /app/scripts/
-    
-    # Wait, base_path should be /app
     project_root = "/app"
     scraper_path = os.path.join(project_root, "scripts", "scrape_tor.py")
     stats_file = "/tmp/dwtip_scrape_status.json"
