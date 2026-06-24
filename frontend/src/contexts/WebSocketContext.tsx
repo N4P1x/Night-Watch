@@ -27,7 +27,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState(false)
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastToastTimeRef = useRef<Record<string, number>>({})
   const { showToast } = useToast()
   const queryClient = useQueryClient()
@@ -65,7 +65,6 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     socket.onclose = () => {
       setIsConnected(false)
       wsRef.current = null
-      setWs(null)
       console.log('WebSocket disconnected')
       
       if (!reconnectTimeoutRef.current) {

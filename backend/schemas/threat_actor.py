@@ -1,24 +1,25 @@
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel
 
 
 class ThreatActorBase(BaseModel):
     name: str
-    aliases: List[str] = []
-    description: Optional[str] = None
-    motivation: Optional[str] = None
-    sophistication: Optional[str] = None
-    resource_level: Optional[str] = None
-    primary_languages: List[str] = []
-    target_industries: List[str] = []
-    target_regions: List[str] = []
-    ttps: List[str] = []
-    associated_malware: List[str] = []
-    associated_tools: List[str] = []
-    associated_ransomware: List[str] = []
-    tags: List[str] = []
-    notes: Optional[str] = None
+    aliases: list[str] = []
+    description: str | None = None
+    motivation: str | None = None
+    sophistication: str | None = None
+    resource_level: str | None = None
+    primary_languages: list[str] = []
+    target_industries: list[str] = []
+    target_regions: list[str] = []
+    ttps: list[str] = []
+    associated_malware: list[str] = []
+    associated_tools: list[str] = []
+    associated_ransomware: list[str] = []
+    tags: list[str] = []
+    notes: str | None = None
 
 
 class ThreatActorCreate(ThreatActorBase):
@@ -26,21 +27,21 @@ class ThreatActorCreate(ThreatActorBase):
 
 
 class ThreatActorUpdate(BaseModel):
-    aliases: Optional[List[str]] = None
-    description: Optional[str] = None
-    motivation: Optional[str] = None
-    sophistication: Optional[str] = None
-    resource_level: Optional[str] = None
-    primary_languages: Optional[List[str]] = None
-    target_industries: Optional[List[str]] = None
-    target_regions: Optional[List[str]] = None
-    ttps: Optional[List[str]] = None
-    associated_malware: Optional[List[str]] = None
-    associated_tools: Optional[List[str]] = None
-    associated_ransomware: Optional[List[str]] = None
-    tags: Optional[List[str]] = None
-    notes: Optional[str] = None
-    is_active: Optional[bool] = None
+    aliases: list[str] | None = None
+    description: str | None = None
+    motivation: str | None = None
+    sophistication: str | None = None
+    resource_level: str | None = None
+    primary_languages: list[str] | None = None
+    target_industries: list[str] | None = None
+    target_regions: list[str] | None = None
+    ttps: list[str] | None = None
+    associated_malware: list[str] | None = None
+    associated_tools: list[str] | None = None
+    associated_ransomware: list[str] | None = None
+    tags: list[str] | None = None
+    notes: str | None = None
+    is_active: bool | None = None
 
 
 class ThreatActor(ThreatActorBase):
@@ -50,10 +51,10 @@ class ThreatActor(ThreatActorBase):
     risk_level: str = "low"
     first_seen: datetime
     last_activity: datetime
-    contact_info: Dict[str, Any] = {}
-    infrastructure_ips: List[str] = []
-    infrastructure_domains: List[str] = []
-    wallet_addresses: List[str] = []
+    contact_info: dict[str, Any] = {}
+    infrastructure_ips: list[str] = []
+    infrastructure_domains: list[str] = []
+    wallet_addresses: list[str] = []
     is_active: bool = True
     created_at: datetime
     updated_at: datetime
@@ -64,12 +65,12 @@ class ThreatActor(ThreatActorBase):
 
 class ThreatActorList(BaseModel):
     total: int
-    actors: List[ThreatActor]
+    actors: list[ThreatActor]
 
 
 class ThreatActorStats(BaseModel):
     total_actors: int
     active_actors: int
-    by_risk_level: Dict[str, int]
-    top_actors: List[Dict[str, Any]]
+    by_risk_level: dict[str, int]
+    top_actors: list[dict[str, Any]]
     recent_activity: int

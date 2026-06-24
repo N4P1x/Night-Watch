@@ -1,6 +1,8 @@
 import logging
 import sys
+
 from loguru import logger
+
 from .config import get_settings
 
 settings = get_settings()

@@ -201,8 +201,7 @@ class AdvancedIOCExtractor:
         if ioc_type == "cve":
             confidence = min(1.0, confidence + 0.1)
 
-        if ioc_type in ("btc_wallet", "eth_wallet", "xmr_wallet"):
-            if any(w in context_lower for w in ["wallet", "bitcoin", "btc", "eth", "xmr", "monero", "payment", "ransom"]):
+        if ioc_type in ("btc_wallet", "eth_wallet", "xmr_wallet") and any(w in context_lower for w in ["wallet", "bitcoin", "btc", "eth", "xmr", "monero", "payment", "ransom"]):
                 confidence = min(1.0, confidence + 0.1)
 
         return round(confidence, 3)

@@ -269,7 +269,7 @@ class ConnectionManager:
         async with self._lock:
             if websocket in self.active_connections:
                 self.active_connections.remove(websocket)
-            for ch, subs in self._channels.items():
+            for _ch, subs in self._channels.items():
                 if websocket in subs:
                     subs.remove(websocket)
 

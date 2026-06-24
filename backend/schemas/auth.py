@@ -1,10 +1,11 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional, List, Dict, Any
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
+from typing import Any
+
+from pydantic import BaseModel, EmailStr
 
 
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     ADMIN = "admin"
     ANALYST = "analyst"
     VIEWER = "viewer"
@@ -16,13 +17,13 @@ class Token(BaseModel):
 
 
 class TokenData(BaseModel):
-    username: Optional[str] = None
+    username: str | None = None
 
 
 class UserBase(BaseModel):
     email: EmailStr
     username: str
-    full_name: Optional[str] = None
+    full_name: str | None = None
     role: UserRole = UserRole.VIEWER
 
 
@@ -31,20 +32,20 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
-    full_name: Optional[str] = None
-    role: Optional[UserRole] = None
-    alert_keywords: Optional[List[str]] = None
-    alert_sources: Optional[List[int]] = None
-    alert_iocs: Optional[List[int]] = None
-    notification_preferences: Optional[Dict[str, Any]] = None
+    email: EmailStr | None = None
+    full_name: str | None = None
+    role: UserRole | None = None
+    alert_keywords: list[str] | None = None
+    alert_sources: list[int] | None = None
+    alert_iocs: list[int] | None = None
+    notification_preferences: dict[str, Any] | None = None
 
 
 class UserInDB(UserBase):
     id: int
     is_active: bool
     is_verified: bool
-    last_login: Optional[datetime] = None
+    last_login: datetime | None = None
     created_at: datetime
 
     class Config:
@@ -63,41 +64,41 @@ class LoginRequest(BaseModel):
 class AlertBase(BaseModel):
     alert_type: str
     title: str
-    description: Optional[str] = None
+    description: str | None = None
     severity: str = "medium"
     confidence: float = 0.5
 
 
 class AlertCreate(AlertBase):
-    user_id: Optional[int] = None
-    source_id: Optional[int] = None
-    source_name: Optional[str] = None
-    entity_type: Optional[str] = None
-    entity_id: Optional[int] = None
-    entity_value: Optional[str] = None
-    matched_keywords: Optional[List[str]] = None
-    meta_data: Optional[Dict[str, Any]] = None
+    user_id: int | None = None
+    source_id: int | None = None
+    source_name: str | None = None
+    entity_type: str | None = None
+    entity_id: int | None = None
+    entity_value: str | None = None
+    matched_keywords: list[str] | None = None
+    meta_data: dict[str, Any] | None = None
 
 
 class AlertUpdate(BaseModel):
-    is_read: Optional[bool] = None
-    is_dismissed: Optional[bool] = None
+    is_read: bool | None = None
+    is_dismissed: bool | None = None
 
 
 class Alert(AlertBase):
     id: int
-    user_id: Optional[int] = None
-    source_id: Optional[int] = None
-    source_name: Optional[str] = None
-    entity_type: Optional[str] = None
-    entity_id: Optional[int] = None
-    entity_value: Optional[str] = None
-    matched_keywords: Optional[List[str]] = []
-    meta_data: Optional[Dict[str, Any]] = {}
+    user_id: int | None = None
+    source_id: int | None = None
+    source_name: str | None = None
+    entity_type: str | None = None
+    entity_id: int | None = None
+    entity_value: str | None = None
+    matched_keywords: list[str] | None = []
+    meta_data: dict[str, Any] | None = {}
     is_read: bool
     is_dismissed: bool
     created_at: datetime
-    read_at: Optional[datetime] = None
+    read_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -106,4 +107,4 @@ class Alert(AlertBase):
 class AlertResponse(BaseModel):
     total: int
     unread: int
-    alerts: List[Alert]
+    alerts: list[Alert]

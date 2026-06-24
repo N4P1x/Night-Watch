@@ -1,19 +1,20 @@
+import json
 import os
 import sys
-import json
 import time
 from datetime import datetime, timedelta
+
 from celery import Task
 from celery.utils.log import get_task_logger
 
 sys.path.insert(0, "/app")
 
-from backend.workers.celery_app import app
 from backend.core.database import SessionLocal
-from backend.models.source import Source
 from backend.models.ioc import IOC
 from backend.models.leak import Leak
-from backend.models.user import User, Alert
+from backend.models.source import Source
+from backend.models.user import Alert, User
+from backend.workers.celery_app import app
 
 logger = get_task_logger(__name__)
 
@@ -46,7 +47,7 @@ class DatabaseTask(Task):
 def get_scrape_status():
     status_file = os.environ.get("SCRAPE_STATUS_FILE", "/tmp/dwtip_scrape_status.json")
     try:
-        with open(status_file, "r") as f:
+        with open(status_file) as f:
             return json.load(f)
     except Exception:
         return {"status": "idle", "progress": 0, "total": 0}
@@ -63,9 +64,10 @@ def update_scrape_status(status_data):
 
 @app.task(bind=True, base=DatabaseTask, name="workers.tasks.scrape_url")
 def scrape_url(self, url: str, source_id: int, scrape_config: dict = None):
+    import re
+
     import requests
     from bs4 import BeautifulSoup
-    import re
 
     config = scrape_config or {}
     timeout = config.get("timeout", 30)
@@ -319,10 +321,11 @@ def scrape_sources(self, limit: int = 50):
 
 @app.task(bind=True, base=DatabaseTask, name="workers.tasks.alert_*")
 def send_alert_email(self, alert_id: int):
-    from backend.core.config import get_settings
     import smtplib
-    from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    from backend.core.config import get_settings
 
     settings = get_settings()
     db = self.db
@@ -439,10 +442,7 @@ def process_ioc_batch(self, ioc_ids: list):
             if ioc:
                 threat_score = 0.0
 
-                if ioc.type == "ip":
-                    if ioc.value.startswith(("10.", "172.16.", "192.168.")):
-                        ioc.is_whitelisted = True
-                    elif any(x in ioc.value for x in ["1.1.1.1", "8.8.8.8"]):
+                if ioc.type == "ip" and (ioc.value.startswith(("10.", "172.16.", "192.168.")) or any(x in ioc.value for x in ["1.1.1.1", "8.8.8.8"])):
                         ioc.is_whitelisted = True
 
                 if "test" in ioc.value.lower() or "example" in ioc.value.lower():

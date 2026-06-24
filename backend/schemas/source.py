@@ -1,48 +1,49 @@
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel
 
 
 class SourceBase(BaseModel):
     name: str
     type: str
-    url: Optional[str] = None
-    onion_url: Optional[str] = None
-    description: Optional[str] = None
+    url: str | None = None
+    onion_url: str | None = None
+    description: str | None = None
     language: str = "en"
     requires_auth: bool = False
-    auth_type: Optional[str] = None
+    auth_type: str | None = None
     is_onion: bool = False
     uses_tor: bool = False
     scrape_interval_minutes: int = 60
-    tags: List[str] = []
+    tags: list[str] = []
 
 
 class SourceCreate(SourceBase):
-    credentials: Optional[Dict[str, str]] = None
-    scraping_config: Optional[Dict[str, Any]] = None
-    selectors: Optional[Dict[str, str]] = None
+    credentials: dict[str, str] | None = None
+    scraping_config: dict[str, Any] | None = None
+    selectors: dict[str, str] | None = None
 
 
 class SourceUpdate(BaseModel):
-    name: Optional[str] = None
-    type: Optional[str] = None
-    url: Optional[str] = None
-    onion_url: Optional[str] = None
-    description: Optional[str] = None
-    requires_auth: Optional[bool] = None
-    is_active: Optional[bool] = None
-    scrape_interval_minutes: Optional[int] = None
-    tags: Optional[List[str]] = None
+    name: str | None = None
+    type: str | None = None
+    url: str | None = None
+    onion_url: str | None = None
+    description: str | None = None
+    requires_auth: bool | None = None
+    is_active: bool | None = None
+    scrape_interval_minutes: int | None = None
+    tags: list[str] | None = None
 
 
 class Source(SourceBase):
     id: int
-    scraping_config: Optional[Dict[str, Any]] = {}
-    selectors: Optional[Dict[str, str]] = {}
+    scraping_config: dict[str, Any] | None = {}
+    selectors: dict[str, str] | None = {}
     reliability_score: float = 0.5
-    last_scraped: Optional[datetime] = None
-    last_success: Optional[datetime] = None
+    last_scraped: datetime | None = None
+    last_success: datetime | None = None
     scrape_failure_count: int = 0
     created_at: datetime
     updated_at: datetime
@@ -53,13 +54,13 @@ class Source(SourceBase):
 
 class SourceList(BaseModel):
     total: int
-    sources: List[Source]
+    sources: list[Source]
 
 
 class SourceHealthResponse(BaseModel):
     source_id: int
     source_name: str
     status: str
-    response_time_ms: Optional[int] = None
+    response_time_ms: int | None = None
     last_check: datetime
-    error_message: Optional[str] = None
+    error_message: str | None = None

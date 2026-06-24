@@ -2,11 +2,11 @@ import hashlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class SourceType(str, Enum):
+class SourceType(StrEnum):
     TOR_ONION = "tor_onion"
     CLEARNET = "clearnet"
     RSS = "rss"
@@ -16,7 +16,7 @@ class SourceType(str, Enum):
     FORUM = "forum"
 
 
-class ContentCategory(str, Enum):
+class ContentCategory(StrEnum):
     RANSOMWARE_LEAK = "ransomware_leak"
     DATA_BREACH = "data_breach"
     CREDENTIAL_DUMP = "credential_dump"
@@ -28,7 +28,7 @@ class ContentCategory(str, Enum):
     GENERAL = "general"
 
 
-class SeverityLevel(str, Enum):
+class SeverityLevel(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"

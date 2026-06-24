@@ -71,7 +71,7 @@ class _ScrapeState:
                             "failed": int(raw.get(b"failed", b"0")),
                             "duplicates": int(raw.get(b"duplicates", b"0")),
                             "current_url": raw.get(b"current_url", b"").decode(),
-                            "logs": [l.decode() for l in logs],
+                            "logs": [log_line.decode() for log_line in logs],
                             "start_time": raw.get(b"start_time", b"").decode() or None,
                             "end_time": raw.get(b"end_time", b"").decode() or None,
                         }
@@ -135,10 +135,7 @@ class _ScrapeState:
     async def release_lock(self):
         redis = get_redis()
         if redis is not None:
-            try:
-                await redis.delete(REDIS_LOCK_KEY)
-            except Exception:
-                pass
+            await redis.delete(REDIS_LOCK_KEY)
 
     async def get_engine(self) -> ScrapingEngine | None:
         async with self._lock:

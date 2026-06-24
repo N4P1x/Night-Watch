@@ -1,8 +1,8 @@
-from pydantic_settings import BaseSettings
-from functools import lru_cache
-from typing import Optional
-import secrets
 import os
+import secrets
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -12,7 +12,7 @@ class Settings(BaseSettings):
 
     tor_proxy: str = "socks5://localhost:9050"
     tor_control: str = "localhost:9051"
-    tor_password: Optional[str] = None
+    tor_password: str | None = None
 
     secret_key: str = ""
     algorithm: str = "HS256"
@@ -24,12 +24,12 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     alert_email: str = ""
 
-    sentry_dsn: Optional[str] = None
+    sentry_dsn: str | None = None
     log_level: str = "INFO"
 
     playwright_browsers_path: str = "/ms-playwright"
 
-    telegram_api_id: Optional[int] = 0
+    telegram_api_id: int | None = 0
     telegram_api_hash: str = ""
     telegram_session_name: str = "dwtip_session"
 
@@ -78,6 +78,6 @@ class Settings(BaseSettings):
             self.deepdarkcti_path = os.path.join(base_path, "deepdarkCTI")
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     return Settings()

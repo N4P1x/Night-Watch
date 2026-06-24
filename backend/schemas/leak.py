@@ -1,55 +1,56 @@
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel
 
 
 class LeakBase(BaseModel):
     title: str
-    description: Optional[str] = None
-    victim_name: Optional[str] = None
-    victim_industry: Optional[str] = None
-    victim_country: Optional[str] = None
-    victim_website: Optional[str] = None
-    victim_size: Optional[str] = None
-    actor_name: Optional[str] = None
-    source_url: Optional[str] = None
+    description: str | None = None
+    victim_name: str | None = None
+    victim_industry: str | None = None
+    victim_country: str | None = None
+    victim_website: str | None = None
+    victim_size: str | None = None
+    actor_name: str | None = None
+    source_url: str | None = None
     status: str = "new"
     severity: str = "medium"
     confidence: float = 0.5
-    data_types: List[str] = []
-    data_size: Optional[str] = None
-    record_count: Optional[int] = None
-    published_date: Optional[datetime] = None
-    deadline_date: Optional[datetime] = None
-    asking_price: Optional[str] = None
-    currency: Optional[str] = None
-    tags: List[str] = []
+    data_types: list[str] = []
+    data_size: str | None = None
+    record_count: int | None = None
+    published_date: datetime | None = None
+    deadline_date: datetime | None = None
+    asking_price: str | None = None
+    currency: str | None = None
+    tags: list[str] = []
 
 
 class LeakCreate(LeakBase):
-    source_id: Optional[int] = None
-    actor_id: Optional[int] = None
+    source_id: int | None = None
+    actor_id: int | None = None
 
 
 class LeakUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    victim_name: Optional[str] = None
-    victim_industry: Optional[str] = None
-    victim_country: Optional[str] = None
-    status: Optional[str] = None
-    severity: Optional[str] = None
-    confidence: Optional[float] = None
-    is_verified: Optional[bool] = None
-    tags: Optional[List[str]] = None
+    title: str | None = None
+    description: str | None = None
+    victim_name: str | None = None
+    victim_industry: str | None = None
+    victim_country: str | None = None
+    status: str | None = None
+    severity: str | None = None
+    confidence: float | None = None
+    is_verified: bool | None = None
+    tags: list[str] | None = None
 
 
 class Leak(LeakBase):
     id: int
-    actor_id: Optional[int] = None
-    source_id: Optional[int] = None
-    screenshot_url: Optional[str] = None
-    extracted_iocs: List[str] = []
+    actor_id: int | None = None
+    source_id: int | None = None
+    screenshot_url: str | None = None
+    extracted_iocs: list[str] = []
     is_active: bool = True
     is_verified: bool = False
     created_at: datetime
@@ -61,14 +62,14 @@ class Leak(LeakBase):
 
 class LeakList(BaseModel):
     total: int
-    leaks: List[Leak]
+    leaks: list[Leak]
 
 
 class LeakStats(BaseModel):
     total_leaks: int
     new_today: int
-    by_severity: Dict[str, int]
-    by_industry: Dict[str, int]
-    by_country: Dict[str, int]
-    top_actors: List[Dict[str, Any]]
-    recent_activity: List[Leak]
+    by_severity: dict[str, int]
+    by_industry: dict[str, int]
+    by_country: dict[str, int]
+    top_actors: list[dict[str, Any]]
+    recent_activity: list[Leak]

@@ -10,7 +10,7 @@ from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import httpx
@@ -27,7 +27,7 @@ from backend.scrapers.base import (
 from backend.scrapers.classifiers import ContentClassifier
 
 
-class CircuitState(str, Enum):
+class CircuitState(StrEnum):
     CLOSED = "closed"
     OPEN = "open"
     HALF_OPEN = "half_open"
@@ -47,8 +47,7 @@ class CircuitBreaker:
 
     @property
     def state(self) -> CircuitState:
-        if self._state == CircuitState.OPEN and self._last_failure_time:
-            if time.time() - self._last_failure_time >= self.recovery_timeout:
+        if self._state == CircuitState.OPEN and self._last_failure_time and time.time() - self._last_failure_time >= self.recovery_timeout:
                 self._state = CircuitState.HALF_OPEN
                 self._half_open_calls = 0
         return self._state

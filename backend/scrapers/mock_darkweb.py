@@ -155,9 +155,9 @@ h1 {{ color: #ff4444; border-bottom: 2px solid #ff4444; }}
 
     def _serve_leak_detail(self, slug: str):
         leak = None
-        for l in LEAKS:
-            if l["victim"].lower().replace(" ", "-").replace(".", "")[:40] == slug:
-                leak = l
+        for leak_item in LEAKS:
+            if leak_item["victim"].lower().replace(" ", "-").replace(".", "")[:40] == slug:
+                leak = leak_item
                 break
         if not leak:
             self._html(404, "<html><body><h1>Leak not found</h1></body></html>")

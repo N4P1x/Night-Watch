@@ -1,65 +1,66 @@
-from fastapi import (
-    FastAPI,
-    Depends,
-    HTTPException,
-    status,
-    WebSocket,
-    WebSocketDisconnect,
-    Request,
-    BackgroundTasks,
-)
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
-from typing import List
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from collections import defaultdict
-from datetime import datetime as dt
 import json
 import re
 import subprocess
 import sys
+from collections import defaultdict
+from datetime import datetime, timedelta
+from datetime import datetime as dt
+
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
 from backend.core.database import (
-    get_db,
-    connect_mongo,
     close_mongo,
-    connect_redis,
     close_redis,
+    connect_mongo,
+    connect_redis,
+    get_db,
 )
-from backend.models.user import User as UserModel, Alert as AlertModel
-from backend.models.threat_actor import ThreatActor as ThreatActorModel
-from backend.models.leak import Leak as LeakModel
 from backend.models.ioc import IOC as IOCModel
-from backend.models.source import Source as SourceModel
+from backend.models.leak import Leak as LeakModel
 from backend.models.post import Post as PostModel
+from backend.models.source import Source as SourceModel
+from backend.models.threat_actor import ThreatActor as ThreatActorModel
+from backend.models.user import Alert as AlertModel
+from backend.models.user import User as UserModel
 from backend.schemas import (
-    Token,
-    UserCreate,
-    User,
-    ThreatActorList,
-    ThreatActorCreate,
-    ThreatActor,
-    LeakList,
-    LeakCreate,
-    Leak,
-    IOCList,
-    IOCCreate,
     IOC,
-    SourceList,
-    SourceCreate,
-    Source,
-    PostList,
-    PostCreate,
-    Post,
     Alert,
     AlertCreate,
     AlertResponse,
     AlertUpdate,
+    IOCCreate,
+    IOCList,
+    Leak,
+    LeakCreate,
+    LeakList,
+    Post,
+    PostCreate,
+    PostList,
+    Source,
+    SourceCreate,
+    SourceList,
+    ThreatActor,
+    ThreatActorCreate,
+    ThreatActorList,
+    Token,
+    User,
+    UserCreate,
     UserUpdate,
 )
 
@@ -138,7 +139,7 @@ async def rate_limit_middleware(request: Request, call_next):
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: list[WebSocket] = []
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -201,7 +202,7 @@ async def get_current_user(
         if username is None:
             raise credentials_exception
     except JWTError:
-        raise credentials_exception
+        raise credentials_exception from None
     user = db.query(UserModel).filter(UserModel.username == username).first()
     if user is None:
         raise credentials_exception
@@ -497,8 +498,8 @@ async def create_ioc(ioc: IOCCreate, db: Session = Depends(get_db)):
     return db_ioc
 
 
-@app.post("/api/v1/iocs/bulk", response_model=List[IOC])
-async def create_iocs_bulk(iocs_data: List[IOCCreate], db: Session = Depends(get_db)):
+@app.post("/api/v1/iocs/bulk", response_model=list[IOC])
+async def create_iocs_bulk(iocs_data: list[IOCCreate], db: Session = Depends(get_db)):
     created = []
     for ioc_data in iocs_data:
         existing = db.query(IOCModel).filter(IOCModel.value == ioc_data.value).first()
@@ -622,7 +623,7 @@ async def import_deepdarkcti_sources(db: Session = Depends(get_db)):
 
         try:
             with open(
-                os.path.join(DEEPDARKCTI_PATH, filename), "r", encoding="utf-8"
+                os.path.join(DEEPDARKCTI_PATH, filename), encoding="utf-8"
             ) as f:
                 content = f.read()
 
@@ -827,15 +828,14 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
 
 def run_scraper(scraper_path, base_path, stats_file):
     try:
-        log_file = open("/tmp/scraper.log", "w")
-        proc = subprocess.Popen(
-            [sys.executable, "-u", scraper_path, "800", "5"],
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            cwd=base_path,
-        )
-        proc.wait()
-        log_file.close()
+        with open("/tmp/scraper.log", "w") as log_file:
+            proc = subprocess.Popen(
+                [sys.executable, "-u", scraper_path, "800", "5"],
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                cwd=base_path,
+            )
+            proc.wait()
     except Exception as e:
         with open(stats_file, "w") as f:
             json.dump(
@@ -891,7 +891,7 @@ async def get_scrape_status(
     stats_file = "/tmp/dwtip_scrape_status.json"
 
     if os.path.exists(stats_file):
-        with open(stats_file, "r") as f:
+        with open(stats_file) as f:
             return json.load(f)
 
     return {

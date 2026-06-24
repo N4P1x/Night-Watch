@@ -1,7 +1,9 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
 import os
+
+from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, sessionmaker
 
 from .config import get_settings
 
@@ -17,6 +19,7 @@ def get_database_url():
             "Falling back to SQLite from PostgreSQL. "
             "This is a development-only behavior. Set DATABASE_URL to a production database.",
             DeprecationWarning,
+            stacklevel=2,
         )
         return "sqlite:///./dwtip.db"
 
@@ -51,6 +54,9 @@ except Exception:
     )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+async_engine = create_async_engine("sqlite+aiosqlite:///./dwtip.db", connect_args={"check_same_thread": False})
+AsyncSessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=async_engine, class_=AsyncSession)
 
 Base = declarative_base()
 

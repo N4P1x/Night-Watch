@@ -1,17 +1,19 @@
+import enum
+from datetime import datetime
+
 from sqlalchemy import (
+    JSON,
+    Boolean,
     Column,
+    DateTime,
+    Float,
+    ForeignKey,
     Integer,
     String,
     Text,
-    DateTime,
-    Boolean,
-    JSON,
-    Float,
-    ForeignKey,
 )
-from datetime import datetime
+
 from ..core.database import Base
-import enum
 
 
 class UserRole(enum.Enum):

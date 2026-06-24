@@ -1,8 +1,8 @@
+import os
+import sys
+
 from celery import Celery
 from kombu import Exchange, Queue
-import os
-
-import sys
 
 sys.path.insert(0, "/app")
 

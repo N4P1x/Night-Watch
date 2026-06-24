@@ -1,9 +1,9 @@
-from .threat_actor import ThreatActor, ThreatActorAlias
-from .leak import Leak, LeakTag, LeakStatus, LeakSeverity
-from .ioc import IOC, IOCTag, IOCRelation, IOCType
-from .source import Source, SourceHealth, SourceType
+from .ioc import IOC, IOCRelation, IOCTag, IOCType
+from .leak import Leak, LeakSeverity, LeakStatus, LeakTag
 from .post import Post, PostAttachment
-from .user import User, Alert, UserRole
+from .source import Source, SourceHealth, SourceType
+from .threat_actor import ThreatActor, ThreatActorAlias
+from .user import Alert, User, UserRole
 
 __all__ = [
     "ThreatActor",

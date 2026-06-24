@@ -52,8 +52,8 @@ async def websocket_endpoint(
     await manager.connect(websocket, channels=[channel] if channel != "default" else None)
 
     try:
-        while True:
-            data = await websocket.receive_text()
+            while True:
+                await websocket.receive_text()
     except WebSocketDisconnect:
         pass
     finally:

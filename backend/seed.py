@@ -6,12 +6,13 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.core.database import init_postgresql, SessionLocal
-from backend.models.user import User
-from backend.models.source import Source
-from backend.models.threat_actor import ThreatActor
+from datetime import UTC, datetime
+
 from passlib.context import CryptContext
-from datetime import datetime, timezone
+
+from backend.core.database import SessionLocal, init_postgresql
+from backend.models.source import Source
+from backend.models.user import User
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -27,7 +28,7 @@ async def seed_data():
                 hashed_password=pwd_context.hash("admin123"),
                 role="admin",
                 is_active=True,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
             db.add(admin)
             db.commit()

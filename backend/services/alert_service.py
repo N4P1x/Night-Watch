@@ -39,7 +39,7 @@ class AlertService:
             select(func.count()).select_from(
                 select(AlertModel).filter(
                     AlertModel.user_id == user_id,
-                    AlertModel.is_read == False
+                    not AlertModel.is_read
                 ).subquery()
             )
         )
@@ -87,7 +87,7 @@ class AlertService:
     async def mark_all_read(self, user_id: int) -> dict:
         await self.db.execute(
             update(AlertModel)
-            .where(AlertModel.user_id == user_id, AlertModel.is_read == False)
+            .where(AlertModel.user_id == user_id, AlertModel.is_read.is_(False))
             .values(is_read=True)
         )
         await self.db.commit()

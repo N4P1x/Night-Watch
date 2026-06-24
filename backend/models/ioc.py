@@ -1,17 +1,19 @@
+import enum
+from datetime import datetime
+
 from sqlalchemy import (
+    JSON,
+    Boolean,
     Column,
+    DateTime,
+    Float,
+    ForeignKey,
     Integer,
     String,
     Text,
-    DateTime,
-    Boolean,
-    JSON,
-    Float,
-    ForeignKey,
 )
 from sqlalchemy.orm import relationship
-from datetime import datetime
-import enum
+
 from ..core.database import Base
 
 
