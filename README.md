@@ -8,7 +8,7 @@ A production-ready cyber threat intelligence platform for monitoring dark web th
 - **IOC Extraction** — Automatic extraction of 17+ indicator types: IPs, domains, URLs, emails, cryptocurrency wallets, file hashes (MD5/SHA1/SHA256), CVE IDs, and more
 - **Threat Actor Tracking** — Profile management for ransomware groups and cybercriminal organizations with aliases, TTPs, associated malware/tools, and infrastructure tracking
 - **Real-time Alerts** — Configurable alerts for keyword matches, new threats, and IOC sightings with WebSocket push and optional email notifications
-- **Interactive Dashboard** — React-based single-page application with charts, maps, and real-time updates
+- **Operations Console** — Dense React + TypeScript SOC interface: severity tables, actor profiles with MITRE TTPs, IOC breakdowns, source management, alert triage, live WebSocket status. Keyboard-first: `G+D/L/A/I/S/E` navigation, `⌘K` global leak search.
 - **Scalable Architecture** — Docker Compose microservices with Celery task queues, Redis caching, PostgreSQL + MongoDB storage
 - **Role-Based Access Control** — Multi-user support with admin, analyst, and viewer roles
 - **Source Credential Encryption** — Fernet-encrypted storage for authenticated source credentials

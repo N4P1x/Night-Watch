@@ -1,66 +1,27 @@
-import { useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import api from '../utils/api'
-import { useToast } from '../components/Toast'
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import api from '../utils/api';
+import { useToast } from '../components/Toast';
+import { PageHeader, Stat, EmptyState, SkeletonRows, SeverityPill } from '../components/ui';
 import {
   MagnifyingGlassIcon,
-  EyeIcon,
   XMarkIcon,
-  FunnelIcon,
   ArrowPathIcon,
-  UserGroupIcon,
-  ShieldCheckIcon,
   PlusIcon,
   PencilIcon,
   TrashIcon,
   ArrowDownTrayIcon,
-  FlagIcon,
-  ExclamationTriangleIcon,
-  BeakerIcon,
-  GlobeAltIcon,
-  EyeSlashIcon,
-  ArchiveBoxIcon,
-  DocumentDuplicateIcon,
-} from '@heroicons/react/24/outline'
+  ChevronLeftIcon,
+  ChevronRightIcon,
+} from '@heroicons/react/24/outline';
 
-const THREAT_TYPES = [
-  'Ransomware',
-  'APT',
-  'Cybercrime',
-  'Hacktivist',
-  'State-Sponsored',
-  'Financially Motivated',
-  'Espionage',
-]
-
-const REGIONS = [
-  'North America',
-  'Europe',
-  'Asia',
-  'Russia/CIS',
-  'Middle East',
-  'Africa',
-  'South America',
-]
-
-const SECTORS = [
-  'Healthcare',
-  'Finance',
-  'Government',
-  'Education',
-  'Critical Infrastructure',
-  'Technology',
-  'Retail',
-  'Manufacturing',
-  'Energy',
-  'Telecommunications',
-]
-
-const PREDEFINED_ACTORS = [
+// Curated seed set — diverse archetypes, not a dozen near-duplicate RaaS entries.
+// Full historical catalog belongs in backend/seed.py, not the bundle.
+const SEED_ACTORS = [
   {
     name: 'LockBit',
-    aliases: ['LockBit 2.0', 'LockBit 3.0', 'Team LockBit'],
-    description: 'One of the most prolific ransomware-as-a-service operations, known for double-extortion tactics and aggressive affiliate program.',
+    aliases: ['LockBit 3.0', 'Team LockBit'],
+    description: 'Prolific ransomware-as-a-service with double-extortion and aggressive affiliate program.',
     threat_type: 'Ransomware',
     risk_level: 'critical',
     origin: 'Russia/CIS',
@@ -69,30 +30,30 @@ const PREDEFINED_ACTORS = [
     resource_level: 'High',
     target_sectors: ['Healthcare', 'Finance', 'Government', 'Critical Infrastructure'],
     target_regions: ['North America', 'Europe'],
-    ttps: ['T1486', 'T1490', 'T1562', 'T1070', 'T1021'],
-    tools: ['LockBit Ransomware', 'StealBIT', 'Blacksuit'],
+    ttps: ['T1486', 'T1490', 'T1562', 'T1070'],
+    tools: ['LockBit Ransomware', 'StealBIT'],
     tags: ['ransomware', 'double-extortion', 'RaaS', 'active'],
   },
   {
     name: 'ALPHV/BlackCat',
-    aliases: ['Noberus', 'ALPHV', 'BlackCat'],
-    description: 'Sophisticated ransomware-as-a-service group using a Rust-based ransomware, known for targeting healthcare and critical infrastructure.',
+    aliases: ['Noberus', 'ALPHV'],
+    description: 'Rust-based RaaS known for healthcare and critical infrastructure targeting.',
     threat_type: 'Ransomware',
     risk_level: 'critical',
     origin: 'Russia/CIS',
     motivation: 'Financial',
     sophistication: 'Very High',
     resource_level: 'High',
-    target_sectors: ['Healthcare', 'Energy', 'Finance', 'Critical Infrastructure'],
+    target_sectors: ['Healthcare', 'Energy', 'Finance'],
     target_regions: ['North America', 'Europe'],
-    ttps: ['T1486', 'T1490', 'T1562', 'T1059', 'T1021'],
-    tools: ['BlackCat Ransomware', 'Exmatter', 'Cobalt Strike'],
+    ttps: ['T1486', 'T1490', 'T1059', 'T1021'],
+    tools: ['BlackCat Ransomware', 'Exmatter'],
     tags: ['ransomware', 'Rust', 'RaaS', 'active'],
   },
   {
     name: 'Clop',
-    aliases: ['CLOP', 'Clop Ransomware'],
-    description: 'Russia-based ransomware group known for CLOPta campaign, targeting healthcare, finance, and education sectors with double-extortion.',
+    aliases: ['CLOP'],
+    description: 'Ransomware group behind mass-exploitation campaigns (e.g. file-transfer zero-days).',
     threat_type: 'Ransomware',
     risk_level: 'high',
     origin: 'Russia/CIS',
@@ -101,46 +62,14 @@ const PREDEFINED_ACTORS = [
     resource_level: 'High',
     target_sectors: ['Healthcare', 'Education', 'Finance'],
     target_regions: ['North America', 'Europe', 'Asia'],
-    ttps: ['T1486', 'T1490', 'T1059', 'T1070'],
-    tools: ['Clop Ransomware', 'TrickBot', 'Cobalt Strike'],
+    ttps: ['T1486', 'T1190', 'T1059'],
+    tools: ['Clop Ransomware'],
     tags: ['ransomware', 'double-extortion', 'active'],
   },
   {
-    name: 'Conti',
-    aliases: ['Conti Ransomware', 'Wizard Spider', 'Gold Blackburn'],
-    description: 'Notorious ransomware group responsible for numerous high-profile attacks, known for rapid encryption and data theft.',
-    threat_type: 'Ransomware',
-    risk_level: 'critical',
-    origin: 'Russia/CIS',
-    motivation: 'Financial',
-    sophistication: 'Very High',
-    resource_level: 'Very High',
-    target_sectors: ['Healthcare', 'Government', 'Finance', 'Critical Infrastructure'],
-    target_regions: ['North America', 'Europe'],
-    ttps: ['T1486', 'T1490', 'T1059', 'T1070', 'T1021', 'T1005'],
-    tools: ['Conti Ransomware', 'Cobalt Strike', 'TrickBot'],
-    tags: ['ransomware', 'double-extortion', 'nation-state-tied'],
-  },
-  {
-    name: 'REvil',
-    aliases: ['Sodinokibi', 'Sodin', 'REvil Ransomware'],
-    description: 'Aggressive ransomware group known for high-profile attacks including Kaseya and JBS Foods, operates RaaS model.',
-    threat_type: 'Ransomware',
-    risk_level: 'critical',
-    origin: 'Russia/CIS',
-    motivation: 'Financial',
-    sophistication: 'Very High',
-    resource_level: 'High',
-    target_sectors: ['Technology', 'Healthcare', 'Finance', 'Retail'],
-    target_regions: ['North America', 'Europe'],
-    ttps: ['T1486', 'T1490', 'T1059', 'T1070', 'T1021'],
-    tools: ['Sodinokibi Ransomware', 'Gandcrab'],
-    tags: ['ransomware', 'RaaS', 'high-profile'],
-  },
-  {
     name: 'Lazarus Group',
-    aliases: ['Hidden Cobra', 'Zinc', 'APT38', 'Guardians of Peace'],
-    description: 'North Korean state-sponsored APT group responsible for financial crimes, cyber espionage, and destructive attacks.',
+    aliases: ['Hidden Cobra', 'APT38'],
+    description: 'North Korean state-sponsored group: financial crime, espionage, destructive attacks.',
     threat_type: 'APT',
     risk_level: 'critical',
     origin: 'Asia',
@@ -149,705 +78,525 @@ const PREDEFINED_ACTORS = [
     resource_level: 'State-Level',
     target_sectors: ['Finance', 'Government', 'Technology', 'Energy'],
     target_regions: ['North America', 'Europe', 'Asia'],
-    ttps: ['T1486', 'T1059', 'T1070', 'T1005', 'T1047', 'T1012'],
-    tools: ['HPC malware', 'FALLCHILL', 'MANICULTIM', 'Cobalt Strike'],
-    tags: ['apt', 'state-sponsored', 'financial-crime', 'north-korea'],
+    ttps: ['T1059', 'T1070', 'T1005', 'T1021'],
+    tools: ['FALLCHILL', 'MANUSCript'],
+    tags: ['apt', 'state-sponsored', 'financial-crime'],
   },
   {
     name: 'APT29',
-    aliases: ['Cozy Bear', 'The Dukes', 'Nobelium'],
-    description: 'Russian state-sponsored APT associated with SVR, known for SolarWinds compromise and political espionage operations.',
+    aliases: ['Cozy Bear', 'Nobelium'],
+    description: 'Russian SVR-associated APT known for supply-chain compromise and political espionage.',
     threat_type: 'APT',
     risk_level: 'critical',
     origin: 'Russia/CIS',
     motivation: 'Espionage',
     sophistication: 'Extremely High',
     resource_level: 'State-Level',
-    target_sectors: ['Government', 'Technology', 'Healthcare', 'Defense'],
+    target_sectors: ['Government', 'Technology', 'Healthcare'],
     target_regions: ['North America', 'Europe'],
-    ttps: ['T1059', 'T1070', 'T1005', 'T1047', 'T1012', 'T1560'],
-    tools: 'WellMess, Spyder, CozyCar, NOBELIUM malware',
-    tags: ['apt', 'russian', 'state-sponsored', 'espionage'],
-  },
-  {
-    name: 'APT41',
-    aliases: ['Barium', 'Wicked Panda', 'Winnti Group'],
-    description: 'Chinese state-sponsored APT conducting both espionage and financial crime operations, known for supply chain attacks.',
-    threat_type: 'APT',
-    risk_level: 'high',
-    origin: 'Asia',
-    motivation: 'Espionage',
-    sophistication: 'Very High',
-    resource_level: 'State-Level',
-    target_sectors: ['Technology', 'Healthcare', 'Telecommunications', 'Gaming'],
-    target_regions: ['North America', 'Europe', 'Asia'],
-    ttps: ['T1059', 'T1070', 'T1005', 'T1021', 'T1486'],
-    tools: ['Winnti malware', 'PlugX', 'CROSSWALK', 'ShadowPad'],
-    tags: ['apt', 'chinese', 'state-sponsored', 'supply-chain'],
-  },
-  {
-    name: 'DarkSide',
-    aliases: ['DarkSide Ransomware'],
-    description: 'Ransomware group responsible for Colonial Pipeline attack, known for affiliate model and causing major disruptions.',
-    threat_type: 'Ransomware',
-    risk_level: 'high',
-    origin: 'Russia/CIS',
-    motivation: 'Financial',
-    sophistication: 'High',
-    resource_level: 'High',
-    target_sectors: ['Energy', 'Critical Infrastructure', 'Technology'],
-    target_regions: ['North America', 'Europe'],
-    ttps: ['T1486', 'T1490', 'T1059', 'T1021'],
-    tools: ['DarkSide Ransomware'],
-    tags: ['ransomware', 'critical-infrastructure', 'discontinued'],
-  },
-  {
-    name: 'Hive',
-    aliases: ['Hive Ransomware'],
-    description: 'Ransomware-as-a-service group known for healthcare sector targeting and rapid encryption capabilities.',
-    threat_type: 'Ransomware',
-    risk_level: 'high',
-    origin: 'Unknown',
-    motivation: 'Financial',
-    sophistication: 'High',
-    resource_level: 'High',
-    target_sectors: ['Healthcare', 'Critical Infrastructure', 'Finance'],
-    target_regions: ['North America', 'Europe'],
-    ttps: ['T1486', 'T1490', 'T1059', 'T1021'],
-    tools: ['Hive Ransomware'],
-    tags: ['ransomware', 'RaaS', 'healthcare'],
-  },
-  {
-    name: 'Royal',
-    aliases: ['Royal Ransomware'],
-    description: 'Emerging ransomware group known for targeting healthcare and critical infrastructure with double-extortion.',
-    threat_type: 'Ransomware',
-    risk_level: 'high',
-    origin: 'Unknown',
-    motivation: 'Financial',
-    sophistication: 'High',
-    resource_level: 'High',
-    target_sectors: ['Healthcare', 'Education', 'Critical Infrastructure'],
-    target_regions: ['North America', 'Europe'],
-    ttps: ['T1486', 'T1490', 'T1059', 'T1021'],
-    tools: ['Royal Ransomware', 'Cobalt Strike'],
-    tags: ['ransomware', 'double-extortion', 'active'],
+    ttps: ['T1059', 'T1070', 'T1560'],
+    tools: ['WellMess', 'NOBELIUM tooling'],
+    tags: ['apt', 'state-sponsored', 'espionage'],
   },
   {
     name: 'Black Basta',
     aliases: ['Black Basta Ransomware'],
-    description: 'Ransomware group with suspected ties to Conti, known for targeting critical infrastructure and healthcare.',
+    description: 'RaaS with suspected Conti lineage, focused on critical infrastructure and healthcare.',
     threat_type: 'Ransomware',
     risk_level: 'high',
     origin: 'Russia/CIS',
     motivation: 'Financial',
     sophistication: 'High',
     resource_level: 'High',
-    target_sectors: ['Healthcare', 'Energy', 'Finance', 'Critical Infrastructure'],
+    target_sectors: ['Healthcare', 'Energy', 'Finance'],
     target_regions: ['North America', 'Europe'],
-    ttps: ['T1486', 'T1490', 'T1059', 'T1021'],
+    ttps: ['T1486', 'T1490', 'T1021'],
     tools: ['Black Basta Ransomware', 'QakBot'],
     tags: ['ransomware', 'double-extortion', 'active'],
   },
-]
+];
+
+const EMPTY_FORM: any = {
+  name: '',
+  aliases: [],
+  description: '',
+  threat_type: 'Ransomware',
+  risk_level: 'high',
+  origin: '',
+  motivation: 'Financial',
+  sophistication: 'High',
+  resource_level: 'Medium',
+  target_sectors: [],
+  target_regions: [],
+  ttps: [],
+  tools: [],
+  tags: [],
+  is_active: true,
+};
+
+function csvCell(v: unknown) {
+  return `"${String(v ?? '').replace(/"/g, '""')}"`;
+}
 
 export default function ThreatActors() {
-  const [search, setSearch] = useState('')
-  const [riskLevel, setRiskLevel] = useState<string>('')
-  const [isActive, setIsActive] = useState<boolean | null>(null)
-  const [page, setPage] = useState(0)
-  const [selectedActor, setSelectedActor] = useState<any>(null)
-  const [showFilters, setShowFilters] = useState(false)
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [editingActor, setEditingActor] = useState<any>(null)
-  const { showToast } = useToast()
-  const queryClient = useQueryClient()
+  const [search, setSearch] = useState('');
+  const [risk, setRisk] = useState('');
+  const [active, setActive] = useState<'all' | 'active' | 'idle'>('all');
+  const [page, setPage] = useState(0);
+  const [drawer, setDrawer] = useState<null | { mode: 'view'; actor: any } | { mode: 'add' } | { mode: 'edit'; actor: any }>(null);
+  const [form, setForm] = useState<any>(EMPTY_FORM);
+  const { showToast } = useToast();
+  const queryClient = useQueryClient();
+  const LIMIT = 20;
 
-  const { data, isLoading, error, isFetching, refetch } = useQuery({
-    queryKey: ['threat-actors', page],
-    queryFn: async () => {
-      const response = await api.get('/v1/threat-actors', {
-        params: { search, skip: page * 20, limit: 100 }
-      })
-      return response.data
-    },
-  })
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
+    queryKey: ['threat-actors', search, page],
+    queryFn: async () =>
+      (
+        await api.get('/v1/threat-actors', {
+          params: { search: search || undefined, skip: page * LIMIT, limit: LIMIT },
+        })
+      ).data,
+  });
 
-  const filteredActors = data?.actors?.filter((actor: any) => {
-    if (search && !actor.name.toLowerCase().includes(search.toLowerCase()) && 
-        !actor.aliases?.some((a: string) => a.toLowerCase().includes(search.toLowerCase()))) return false
-    if (riskLevel && actor.risk_level !== riskLevel) return false
-    if (isActive !== null && actor.is_active !== isActive) return false
-    return true
-  }) || []
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['threat-actors'] });
+
+  const actors: any[] = (data?.actors ?? []).filter((a: any) => {
+    if (risk && a.risk_level !== risk) return false;
+    if (active !== 'all' && Boolean(a.is_active) !== (active === 'active')) return false;
+    return true;
+  });
 
   const stats = {
-    total: data?.total || 0,
-    active: data?.actors?.filter((a: any) => a.is_active).length || 0,
-    critical: data?.actors?.filter((a: any) => a.risk_level === 'critical').length || 0,
-    high: data?.actors?.filter((a: any) => a.risk_level === 'high').length || 0,
-  }
+    total: data?.total ?? 0,
+    active: (data?.actors ?? []).filter((a: any) => a.is_active).length,
+    critical: (data?.actors ?? []).filter((a: any) => a.risk_level === 'critical').length,
+  };
 
-  const handleRefresh = () => {
-    refetch()
-    showToast('Refreshing threat actors...', 'info')
-  }
-
-  const handleSeedData = async () => {
-    showToast('Adding known threat actors...', 'info')
-    let added = 0
-    for (const actor of PREDEFINED_ACTORS) {
+  const seed = async () => {
+    showToast('Seeding known actors…', 'info');
+    let added = 0;
+    for (const actor of SEED_ACTORS) {
       try {
-        await api.post('/v1/threat-actors', actor)
-        added++
+        await api.post('/v1/threat-actors', actor);
+        added++;
       } catch (e: any) {
-        if (e.response?.status === 409) {
-          continue
-        }
+        if (e?.response?.status !== 409) break;
       }
     }
-    queryClient.invalidateQueries({ queryKey: ['threat-actors'] })
-    showToast(`Added ${added} threat actors`, 'success')
-  }
+    invalidate();
+    showToast(`Seeded ${added} actors (409 = already exists).`, 'success');
+  };
 
-  const handleDelete = async (actor: any) => {
-    if (!confirm(`Delete ${actor.name}?`)) return
+  const remove = async (actor: any) => {
+    if (!window.confirm(`Delete ${actor.name}?`)) return;
     try {
-      await api.delete(`/api/v1/threat-actors/${actor.id}`)
-      queryClient.invalidateQueries({ queryKey: ['threat-actors'] })
-      showToast(`${actor.name} deleted`, 'success')
-      setSelectedActor(null)
-    } catch (e) {
-      showToast('Failed to delete actor', 'error')
+      await api.delete(`/v1/threat-actors/${actor.id}`);
+      invalidate();
+      setDrawer(null);
+      showToast(`${actor.name} deleted.`, 'success');
+    } catch {
+      showToast('Delete failed.', 'error');
     }
-  }
+  };
 
-  const handleToggleActive = async (actor: any) => {
+  const toggle = async (actor: any) => {
     try {
-      await api.put(`/api/v1/threat-actors/${actor.id}`, { is_active: !actor.is_active })
-      queryClient.invalidateQueries({ queryKey: ['threat-actors'] })
-      showToast(`${actor.name} ${actor.is_active ? 'deactivated' : 'activated'}`, 'success')
-    } catch (e) {
-      showToast('Failed to update actor', 'error')
+      await api.put(`/v1/threat-actors/${actor.id}`, { is_active: !actor.is_active });
+      invalidate();
+    } catch {
+      showToast('Update failed.', 'error');
     }
-  }
+  };
 
-  const exportActors = () => {
-    const actors = filteredActors.map((a: any) => ({
-      name: a.name,
-      aliases: a.aliases?.join(', ') || '',
-      risk_level: a.risk_level,
-      is_active: a.is_active,
-      threat_type: a.threat_type,
-      origin: a.origin,
-      target_sectors: a.target_sectors?.join(', ') || '',
-      tools: a.tools?.join(', ') || '',
-      description: a.description,
-    }))
-    const headers = Object.keys(actors[0] || {})
-    const csv = [headers.join(','), ...actors.map((row: Record<string, unknown>) => headers.map((h: string) => `"${row[h] || ''}"`).join(','))].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `threat-actors-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    showToast('Threat actors exported', 'success')
-  }
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
-    showToast('Copied to clipboard', 'success')
-  }
-
-  const getRiskColor = (risk: string) => {
-    switch (risk) {
-      case 'critical': return 'bg-red-500/20 text-red-400 border-red-500/50'
-      case 'high': return 'bg-orange-500/20 text-orange-400 border-orange-500/50'
-      case 'medium': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50'
-      case 'low': return 'bg-green-500/20 text-green-400 border-green-500/50'
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/50'
+  const save = async () => {
+    if (!String(form.name).trim()) {
+      showToast('Name is required.', 'error');
+      return;
     }
-  }
+    try {
+      if (drawer?.mode === 'add') await api.post('/v1/threat-actors', form);
+      else if (drawer?.mode === 'edit') await api.put(`/v1/threat-actors/${(drawer as any).actor.id}`, form);
+      invalidate();
+      setDrawer(null);
+      showToast('Saved.', 'success');
+    } catch (e: any) {
+      showToast('Save failed: ' + (e?.response?.data?.detail || e.message), 'error');
+    }
+  };
 
-  const clearFilters = () => {
-    setRiskLevel('')
-    setIsActive(null)
-    setSearch('')
-  }
+  const exportCSV = () => {
+    if (!actors.length) return;
+    const head = 'name,risk,status,type,origin,sectors';
+    const rows = actors.map((a: any) =>
+      [a.name, a.risk_level, a.is_active ? 'active' : 'idle', a.threat_type || '', a.origin || '', (a.target_sectors ?? []).join('; ')]
+        .map(csvCell)
+        .join(','),
+    );
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([[head, ...rows].join('\n')], { type: 'text/csv' }));
+    a.download = `night-watch-actors-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+  };
 
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4 text-red-400">
-          Error loading threat actors. Please try again.
-        </div>
-      </div>
-    )
-  }
+  const totalPages = Math.max(1, Math.ceil((data?.total || 0) / LIMIT));
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-100">Threat Actors</h1>
-          <p className="text-gray-500 mt-1">
-            {data?.total || 0} tracked ransomware groups and threat actors
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={exportActors} className="btn btn-secondary flex items-center gap-2">
-            <ArrowDownTrayIcon className="w-5 h-5" />
-            Export
-          </button>
-          <button onClick={handleSeedData} className="btn btn-secondary flex items-center gap-2">
-            <BeakerIcon className="w-5 h-5" />
-            Add Known Actors
-          </button>
-          <button onClick={handleRefresh} disabled={isFetching} className="btn btn-secondary flex items-center gap-2">
-            <ArrowPathIcon className={`w-5 h-5 ${isFetching ? 'animate-spin' : ''}`} />
-            {isFetching ? 'Refreshing...' : 'Refresh'}
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="card p-4">
-          <div className="flex items-center gap-3">
-            <UserGroupIcon className="w-8 h-8 text-accent-primary" />
-            <div>
-              <p className="text-2xl font-bold text-gray-100">{stats.total}</p>
-              <p className="text-sm text-gray-500">Total Actors</p>
-            </div>
-          </div>
-        </div>
-        <div className="card p-4">
-          <div className="flex items-center gap-3">
-            <ShieldCheckIcon className="w-8 h-8 text-green-400" />
-            <div>
-              <p className="text-2xl font-bold text-gray-100">{stats.active}</p>
-              <p className="text-sm text-gray-500">Active</p>
-            </div>
-          </div>
-        </div>
-        <div className="card p-4">
-          <div className="flex items-center gap-3">
-            <ExclamationTriangleIcon className="w-8 h-8 text-red-400" />
-            <div>
-              <p className="text-2xl font-bold text-gray-100">{stats.critical}</p>
-              <p className="text-sm text-gray-500">Critical Risk</p>
-            </div>
-          </div>
-        </div>
-        <div className="card p-4">
-          <div className="flex items-center gap-3">
-            <FlagIcon className="w-8 h-8 text-orange-400" />
-            <div>
-              <p className="text-2xl font-bold text-gray-100">{stats.high}</p>
-              <p className="text-sm text-gray-500">High Risk</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1 relative">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-          <input
-            type="text"
-            placeholder="Search threat actors or aliases..."
-            className="input pl-10"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`btn ${showFilters ? 'btn-primary' : 'btn-secondary'} flex items-center gap-2`}
-        >
-          <FunnelIcon className="w-5 h-5" />
-          Filters
-        </button>
-      </div>
-
-      {showFilters && (
-        <div className="card p-4 flex flex-wrap gap-4">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm text-gray-400 mb-1">Risk Level</label>
-            <select
-              className="input w-full"
-              value={riskLevel}
-              onChange={(e) => setRiskLevel(e.target.value)}
+    <div className="min-h-full">
+      <PageHeader
+        eyebrow="Intelligence · Actors"
+        title="Threat actors"
+        description={<>{stats.total.toLocaleString()} tracked groups · click a row for TTPs and tooling.</>}
+        actions={
+          <>
+            <button onClick={() => refetch()} disabled={isFetching} className="btn btn-secondary">
+              Refresh
+            </button>
+            <button onClick={exportCSV} className="btn btn-secondary">
+              <ArrowDownTrayIcon className="w-4 h-4" /> Export
+            </button>
+            <button onClick={seed} className="btn btn-secondary">Seed known</button>
+            <button
+              onClick={() => {
+                setForm(EMPTY_FORM);
+                setDrawer({ mode: 'add' });
+              }}
+              className="btn btn-primary"
             >
-              <option value="">All Levels</option>
+              <PlusIcon className="w-4 h-4" /> Add actor
+            </button>
+          </>
+        }
+      />
+
+      <div className="px-6 py-5 space-y-4 max-w-[1440px]">
+        <div className="grid grid-cols-3 gap-4">
+          <Stat label="Tracked" value={stats.total} />
+          <Stat label="Active" value={stats.active} accent="low" />
+          <Stat label="Critical" value={stats.critical} accent="critical" />
+        </div>
+
+        <div className="nw-panel p-3 flex flex-col md:flex-row gap-2.5 md:items-center">
+          <label className="flex-1 flex items-center gap-2 nw-inset px-3 py-2 focus-within:border-brand/50">
+            <MagnifyingGlassIcon className="w-4 h-4 text-ink-500" />
+            <input
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(0);
+              }}
+              placeholder="Search name or alias…"
+              className="bg-transparent outline-none text-[13px] w-full placeholder:text-ink-500"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} aria-label="Clear" className="text-ink-500 hover:text-white">
+                <XMarkIcon className="w-4 h-4" />
+              </button>
+            )}
+          </label>
+          <div className="flex gap-1.5">
+            {(['all', 'active', 'idle'] as const).map((v) => (
+              <button key={v} onClick={() => setActive(v)} className={`nw-tab capitalize ${active === v ? 'nw-tab-active' : ''}`}>
+                {v}
+              </button>
+            ))}
+          </div>
+          <select value={risk} onChange={(e) => setRisk(e.target.value)} className="input !w-auto" aria-label="Risk">
+            <option value="">All risk</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+
+        <div className="nw-panel overflow-hidden">
+          {isLoading ? (
+            <SkeletonRows rows={8} />
+          ) : isError ? (
+            <div className="p-4">
+              <EmptyState title="Could not load actors" hint="Check the API, then retry." action={<button onClick={() => refetch()} className="btn btn-secondary">Retry</button>} />
+            </div>
+          ) : !actors.length ? (
+            <div className="p-4">
+              <EmptyState
+                title="No actors match"
+                hint="Seed the curated set or add your first actor."
+                action={<button onClick={seed} className="btn btn-secondary">Seed known actors</button>}
+              />
+            </div>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Actor</th>
+                  <th>Risk</th>
+                  <th>Type</th>
+                  <th>Origin</th>
+                  <th>Status</th>
+                  <th className="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {actors.map((a: any) => (
+                  <tr key={a.id} onClick={() => setDrawer({ mode: 'view', actor: a })} className="cursor-pointer">
+                    <td className="max-w-[260px]">
+                      <span className="block text-white font-medium truncate">{a.name}</span>
+                      {!!a.aliases?.length && <span className="block text-[11.5px] text-ink-500 truncate">{a.aliases.slice(0, 3).join(' · ')}</span>}
+                    </td>
+                    <td>
+                      <SeverityPill value={a.risk_level} />
+                    </td>
+                    <td className="text-ink-400 text-[12.5px]">{a.threat_type || '—'}</td>
+                    <td className="text-ink-400 text-[12.5px]">{a.origin || '—'}</td>
+                    <td>
+                      <span className={`badge ${a.is_active ? 'badge-low' : 'badge-neutral'}`}>{a.is_active ? 'Active' : 'Idle'}</span>
+                    </td>
+                    <td className="text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <button onClick={() => toggle(a)} className="btn btn-ghost !px-2 !py-1.5 text-[12.5px]">
+                        {a.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setForm({
+                            name: a.name ?? '',
+                            aliases: a.aliases ?? [],
+                            description: a.description ?? '',
+                            threat_type: a.threat_type ?? 'Ransomware',
+                            risk_level: a.risk_level ?? 'high',
+                            origin: a.origin ?? '',
+                            motivation: a.motivation ?? 'Financial',
+                            sophistication: a.sophistication ?? 'High',
+                            resource_level: a.resource_level ?? 'Medium',
+                            target_sectors: a.target_sectors ?? [],
+                            target_regions: a.target_regions ?? [],
+                            ttps: a.ttps ?? [],
+                            tools: Array.isArray(a.tools) ? a.tools : a.tools ? [a.tools] : [],
+                            tags: a.tags ?? [],
+                            is_active: a.is_active ?? true,
+                          });
+                          setDrawer({ mode: 'edit', actor: a });
+                        }}
+                        className="btn btn-ghost !px-2 !py-1.5"
+                        title="Edit"
+                      >
+                        <PencilIcon className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => remove(a)} className="btn btn-ghost !px-2 !py-1.5 hover:!text-sev-critical" title="Delete">
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <div className="flex items-center justify-between px-4 py-3 border-t border-night-700">
+            <button disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="btn btn-secondary !py-1.5">
+              <ChevronLeftIcon className="w-4 h-4" /> Prev
+            </button>
+            <span className="font-mono text-[12px] text-ink-500 tabular-nums">
+              {page + 1} / {totalPages}
+            </span>
+            <button disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)} className="btn btn-secondary !py-1.5">
+              Next <ChevronRightIcon className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {drawer && (
+        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Actor detail">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setDrawer(null)} />
+          <aside className="absolute right-0 top-0 bottom-0 w-full max-w-[480px] bg-night-900 border-l border-night-700 flex flex-col animate-slide-up">
+            <header className="px-5 py-4 border-b border-night-700 flex items-center justify-between">
+              <div>
+                <p className="nw-eyebrow">{drawer.mode === 'add' ? 'New actor' : drawer.mode === 'edit' ? 'Edit actor' : 'Actor profile'}</p>
+                <p className="text-[14px] font-semibold text-white mt-0.5">
+                  {drawer.mode === 'view' ? (drawer as any).actor.name : drawer.mode === 'edit' ? (drawer as any).actor.name : 'Untitled'}
+                </p>
+              </div>
+              <button onClick={() => setDrawer(null)} className="btn-ghost btn !px-2" aria-label="Close">
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </header>
+
+            {drawer.mode === 'view' ? (
+              <ActorProfile
+                actor={(drawer as any).actor}
+                onEdit={() => {
+                  const a = (drawer as any).actor;
+                  setForm({
+                    name: a.name ?? '',
+                    aliases: a.aliases ?? [],
+                    description: a.description ?? '',
+                    threat_type: a.threat_type ?? 'Ransomware',
+                    risk_level: a.risk_level ?? 'high',
+                    origin: a.origin ?? '',
+                    motivation: a.motivation ?? 'Financial',
+                    sophistication: a.sophistication ?? 'High',
+                    resource_level: a.resource_level ?? 'Medium',
+                    target_sectors: a.target_sectors ?? [],
+                    target_regions: a.target_regions ?? [],
+                    ttps: a.ttps ?? [],
+                    tools: Array.isArray(a.tools) ? a.tools : a.tools ? [a.tools] : [],
+                    tags: a.tags ?? [],
+                    is_active: a.is_active ?? true,
+                  });
+                  setDrawer({ mode: 'edit', actor: a });
+                }}
+                onToggle={() => {
+                  toggle((drawer as any).actor);
+                  setDrawer(null);
+                }}
+                onDelete={() => remove((drawer as any).actor)}
+              />
+            ) : (
+              <ActorForm form={form} setForm={setForm} onCancel={() => setDrawer(null)} onSave={save} mode={drawer.mode} />
+            )}
+          </aside>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActorProfile({ actor: a, onEdit, onToggle, onDelete }: any) {
+  const list = (title: string, items?: string[], mono = false) => (
+    <div>
+      <p className="nw-label">{title}</p>
+      {!items?.length ? (
+        <p className="text-[13px] text-ink-500">—</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {items.map((t: string, i: number) => (
+            <span key={i} className={`badge badge-neutral ${mono ? '!normal-case !tracking-normal font-mono' : ''}`}>
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+  return (
+    <>
+      <div className="flex-1 overflow-y-auto scrollbar p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <SeverityPill value={a.risk_level} />
+          <span className={`badge ${a.is_active ? 'badge-low' : 'badge-neutral'}`}>{a.is_active ? 'Active' : 'Idle'}</span>
+          <span className="badge badge-neutral">{a.threat_type || 'Unknown'}</span>
+        </div>
+        {!!a.aliases?.length && (
+          <p className="text-[12.5px] text-ink-500">
+            Also known as: <span className="text-ink-100">{a.aliases.join(', ')}</span>
+          </p>
+        )}
+        {a.description && <p className="text-[13px] leading-6 text-ink-400">{a.description}</p>}
+        <dl className="grid grid-cols-2 gap-3">
+          {[
+            ['Origin', a.origin || '—'],
+            ['Motivation', a.motivation || '—'],
+            ['Sophistication', a.sophistication || '—'],
+            ['Resources', a.resource_level || '—'],
+          ].map(([k, v]) => (
+            <div key={k} className="nw-inset p-3">
+              <dt className="nw-eyebrow">{k}</dt>
+              <dd className="text-[13px] text-white mt-1">{v}</dd>
+            </div>
+          ))}
+        </dl>
+        {list('Target sectors', a.target_sectors)}
+        {list('Target regions', a.target_regions)}
+        {list('TTPs (MITRE)', a.ttps, true)}
+        {list('Tooling', Array.isArray(a.tools) ? a.tools : a.tools ? [a.tools] : [])}
+        {list('Tags', a.tags)}
+      </div>
+      <footer className="border-t border-night-700 p-4 flex gap-2">
+        <button onClick={onToggle} className="btn btn-secondary flex-1">
+          {a.is_active ? 'Deactivate' : 'Activate'}
+        </button>
+        <button onClick={onEdit} className="btn btn-secondary flex-1">
+          <PencilIcon className="w-4 h-4" /> Edit
+        </button>
+        <button onClick={onDelete} className="btn btn-danger">
+          <TrashIcon className="w-4 h-4" />
+        </button>
+      </footer>
+    </>
+  );
+}
+
+function ActorForm({ form, setForm, onCancel, onSave, mode }: any) {
+  const set = (k: string, v: any) => setForm({ ...form, [k]: v });
+  const arr = (k: string, v: string) =>
+    set(
+      k,
+      v
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+  return (
+    <>
+      <div className="flex-1 overflow-y-auto scrollbar p-5 space-y-4">
+        <div>
+          <label className="nw-label">Name *</label>
+          <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} />
+        </div>
+        <div>
+          <label className="nw-label">Aliases (comma-separated)</label>
+          <input className="input" value={(form.aliases ?? []).join(', ')} onChange={(e) => arr('aliases', e.target.value)} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="nw-label">Risk</label>
+            <select className="input" value={form.risk_level} onChange={(e) => set('risk_level', e.target.value)}>
               <option value="critical">Critical</option>
               <option value="high">High</option>
               <option value="medium">Medium</option>
               <option value="low">Low</option>
             </select>
           </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm text-gray-400 mb-1">Status</label>
-            <select
-              className="input w-full"
-              value={isActive === null ? '' : isActive ? 'active' : 'inactive'}
-              onChange={(e) => {
-                const val = e.target.value
-                setIsActive(val === '' ? null : val === 'active')
-              }}
-            >
-              <option value="">All</option>
-              <option value="active">Active Only</option>
-              <option value="inactive">Inactive Only</option>
+          <div>
+            <label className="nw-label">Type</label>
+            <select className="input" value={form.threat_type} onChange={(e) => set('threat_type', e.target.value)}>
+              {['Ransomware', 'APT', 'Cybercrime', 'Hacktivist', 'State-Sponsored', 'Espionage'].map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
             </select>
           </div>
-          <div className="flex items-end">
-            <button onClick={clearFilters} className="btn btn-secondary">
-              Clear Filters
-            </button>
+        </div>
+        <div>
+          <label className="nw-label">Description</label>
+          <textarea className="input min-h-[72px]" value={form.description} onChange={(e) => set('description', e.target.value)} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="nw-label">Origin</label>
+            <input className="input" value={form.origin} onChange={(e) => set('origin', e.target.value)} />
+          </div>
+          <div>
+            <label className="nw-label">Motivation</label>
+            <input className="input" value={form.motivation} onChange={(e) => set('motivation', e.target.value)} />
           </div>
         </div>
-      )}
-
-      {isLoading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-accent-primary"></div>
+        <div>
+          <label className="nw-label">TTPs (comma-separated MITRE IDs)</label>
+          <input className="input font-mono" value={(form.ttps ?? []).join(', ')} onChange={(e) => arr('ttps', e.target.value)} placeholder="T1486, T1490" />
         </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredActors.length === 0 ? (
-            <div className="card p-12 text-center">
-              <UserGroupIcon className="w-12 h-12 mx-auto text-gray-600 mb-4" />
-              <p className="text-gray-500 text-lg">No threat actors found</p>
-              <p className="text-gray-600 text-sm mt-2">
-                Click "Add Known Actors" to populate with real threat data
-              </p>
-            </div>
-          ) : (
-            filteredActors.map((actor: any) => (
-              <div key={actor.id} className="card p-4 hover:bg-dark-700/50 transition-colors group">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <h3 className="text-lg font-medium text-gray-200">
-                        {actor.name}
-                      </h3>
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getRiskColor(actor.risk_level)}`}>
-                        {actor.risk_level?.toUpperCase() || 'UNKNOWN'}
-                      </span>
-                      {actor.is_active ? (
-                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/50">
-                          ACTIVE
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-500/20 text-gray-400 border border-gray-500/50">
-                          INACTIVE
-                        </span>
-                      )}
-                      {actor.threat_type && (
-                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/50">
-                          {actor.threat_type}
-                        </span>
-                      )}
-                    </div>
-                    
-                    {actor.aliases?.length > 0 && (
-                      <p className="text-gray-500 text-sm mb-2">
-                        <span className="text-gray-400">Aliases:</span> {actor.aliases.join(', ')}
-                      </p>
-                    )}
-                    
-                    <p className="text-gray-400 text-sm line-clamp-2 mb-3">
-                      {actor.description || 'No description available'}
-                    </p>
-                    
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
-                      {actor.origin && (
-                        <span className="flex items-center gap-1">
-                          <GlobeAltIcon className="w-3 h-3" />
-                          {actor.origin}
-                        </span>
-                      )}
-                      <span>First seen: <span className="text-gray-400">{actor.first_seen ? new Date(actor.first_seen).toLocaleDateString() : 'Unknown'}</span></span>
-                      {actor.target_sectors?.length > 0 && (
-                        <span className="flex items-center gap-1">
-                          <FlagIcon className="w-3 h-3" />
-                          {actor.target_sectors.slice(0, 2).join(', ')}
-                          {actor.target_sectors.length > 2 && ` +${actor.target_sectors.length - 2}`}
-                        </span>
-                      )}
-                    </div>
-
-                    {actor.ttps?.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {actor.ttps.slice(0, 5).map((ttp: string) => (
-                          <span key={ttp} className="px-1.5 py-0.5 bg-dark-600 text-gray-400 text-xs rounded">
-                            {ttp}
-                          </span>
-                        ))}
-                        {actor.ttps.length > 5 && (
-                          <span className="px-1.5 py-0.5 text-gray-500 text-xs">
-                            +{actor.ttps.length - 5} more
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => handleToggleActive(actor)}
-                      className="p-2 rounded-lg hover:bg-dark-600 text-gray-400 hover:text-green-400 transition-colors"
-                      title={actor.is_active ? 'Deactivate' : 'Activate'}
-                    >
-                      {actor.is_active ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
-                    </button>
-                    <button
-                      onClick={() => setSelectedActor(actor)}
-                      className="p-2 rounded-lg hover:bg-dark-600 text-gray-400 hover:text-accent-primary transition-colors"
-                      title="View details"
-                    >
-                      <EyeIcon className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(actor)}
-                      className="p-2 rounded-lg hover:bg-dark-600 text-gray-400 hover:text-red-400 transition-colors"
-                      title="Delete"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
+        <div>
+          <label className="nw-label">Tools (comma-separated)</label>
+          <input className="input" value={(form.tools ?? []).join(', ')} onChange={(e) => arr('tools', e.target.value)} />
         </div>
-      )}
-
-      {data && data.total > 20 && (
-        <div className="flex items-center justify-center gap-4 pt-4">
-          <button
-            className="btn btn-secondary"
-            disabled={page === 0}
-            onClick={() => setPage(p => Math.max(0, p - 1))}
-          >
-            Previous
-          </button>
-          <span className="text-gray-500">
-            Page {page + 1} of {Math.ceil(data.total / 20)}
-          </span>
-          <button
-            className="btn btn-secondary"
-            disabled={(page + 1) * 20 >= data.total}
-            onClick={() => setPage(p => p + 1)}
-          >
-            Next
-          </button>
-        </div>
-      )}
-
-      {selectedActor && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-700 border border-dark-500 rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-dark-700 border-b border-dark-500 p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <h2 className="text-xl font-bold text-gray-100">{selectedActor.name}</h2>
-                <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getRiskColor(selectedActor.risk_level)}`}>
-                  {selectedActor.risk_level?.toUpperCase() || 'UNKNOWN'}
-                </span>
-                {selectedActor.is_active && (
-                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/50">
-                    ACTIVE
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleToggleActive(selectedActor)}
-                  className="btn btn-secondary text-sm"
-                >
-                  {selectedActor.is_active ? 'Deactivate' : 'Activate'}
-                </button>
-                <button
-                  onClick={() => handleDelete(selectedActor)}
-                  className="btn btn-danger text-sm"
-                >
-                  <TrashIcon className="w-4 h-4 mr-1" />
-                  Delete
-                </button>
-                <button 
-                  onClick={() => setSelectedActor(null)}
-                  className="p-2 rounded-lg hover:bg-dark-600 text-gray-400 hover:text-gray-200 transition-colors"
-                >
-                  <XMarkIcon className="w-6 h-6" />
-                </button>
-              </div>
-            </div>
-            
-            <div className="p-6 space-y-6">
-              {selectedActor.aliases?.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-400 uppercase mb-2 flex items-center gap-2">
-                    <DocumentDuplicateIcon className="w-4 h-4" />
-                    Aliases
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedActor.aliases.map((alias: string, idx: number) => (
-                      <span key={idx} className="px-3 py-1 bg-dark-500 text-gray-300 text-sm rounded-lg border border-dark-400">
-                        {alias}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              <div>
-                <h4 className="text-sm font-medium text-gray-400 uppercase mb-2">Description</h4>
-                <p className="text-gray-300">{selectedActor.description || 'No description available'}</p>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="card p-3 bg-dark-600">
-                  <p className="text-xs text-gray-500 uppercase mb-1">Type</p>
-                  <p className="text-gray-200 font-medium">{selectedActor.threat_type || 'Unknown'}</p>
-                </div>
-                <div className="card p-3 bg-dark-600">
-                  <p className="text-xs text-gray-500 uppercase mb-1">Origin</p>
-                  <p className="text-gray-200 font-medium">{selectedActor.origin || 'Unknown'}</p>
-                </div>
-                <div className="card p-3 bg-dark-600">
-                  <p className="text-xs text-gray-500 uppercase mb-1">Motivation</p>
-                  <p className="text-gray-200 font-medium">{selectedActor.motivation || 'Unknown'}</p>
-                </div>
-                <div className="card p-3 bg-dark-600">
-                  <p className="text-xs text-gray-500 uppercase mb-1">Sophistication</p>
-                  <p className="text-gray-200 font-medium">{selectedActor.sophistication || 'Unknown'}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-400 uppercase mb-2 flex items-center gap-2">
-                    <GlobeAltIcon className="w-4 h-4" />
-                    Target Regions
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedActor.target_regions?.length > 0 ? (
-                      selectedActor.target_regions.map((region: string, idx: number) => (
-                        <span key={idx} className="px-2 py-1 bg-blue-500/10 text-blue-400 text-xs rounded border border-blue-500/30">
-                          {region}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-gray-500 text-sm">No data</span>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-400 uppercase mb-2 flex items-center gap-2">
-                    <FlagIcon className="w-4 h-4" />
-                    Target Sectors
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedActor.target_sectors?.length > 0 ? (
-                      selectedActor.target_sectors.map((sector: string, idx: number) => (
-                        <span key={idx} className="px-2 py-1 bg-purple-500/10 text-purple-400 text-xs rounded border border-purple-500/30">
-                          {sector}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-gray-500 text-sm">No data</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              {selectedActor.ttps?.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-400 uppercase mb-2 flex items-center gap-2">
-                    <BeakerIcon className="w-4 h-4" />
-                    ATT&CK TTPs
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedActor.ttps.map((ttp: string, idx: number) => (
-                      <span key={idx} className="px-3 py-1 bg-red-500/10 text-red-400 text-sm rounded border border-red-500/30 font-mono">
-                        {ttp}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {selectedActor.tools?.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-400 uppercase mb-2 flex items-center gap-2">
-                    <ExclamationTriangleIcon className="w-4 h-4" />
-                    Tools & Malware
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedActor.tools.map((tool: string, idx: number) => (
-                      <span key={idx} className="px-3 py-1 bg-orange-500/10 text-orange-400 text-sm rounded border border-orange-500/30">
-                        {tool}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedActor.wallet_addresses?.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-400 uppercase mb-2">Wallet Addresses</h4>
-                  <div className="space-y-2">
-                    {selectedActor.wallet_addresses.map((wallet: string, idx: number) => (
-                      <div key={idx} className="flex items-center gap-2 bg-dark-600 p-2 rounded">
-                        <code className="text-gray-300 text-sm flex-1 break-all font-mono">{wallet}</code>
-                        <button
-                          onClick={() => copyToClipboard(wallet)}
-                          className="btn btn-secondary text-xs"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedActor.notes && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-400 uppercase mb-2">Notes</h4>
-                  <p className="text-gray-300 bg-dark-600 p-3 rounded">{selectedActor.notes}</p>
-                </div>
-              )}
-
-              <div className="border-t border-dark-500 pt-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-500">First Seen:</span>
-                    <span className="text-gray-300 ml-2">
-                      {selectedActor.first_seen ? new Date(selectedActor.first_seen).toLocaleString() : 'Unknown'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Last Activity:</span>
-                    <span className="text-gray-300 ml-2">
-                      {selectedActor.last_activity ? new Date(selectedActor.last_activity).toLocaleString() : 'Unknown'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Attribution Score:</span>
-                    <span className="text-gray-300 ml-2">{selectedActor.attribution_score || 0}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Threat Score:</span>
-                    <span className="text-gray-300 ml-2">{selectedActor.threat_score || 0}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
+        <label className="flex items-center gap-2 text-[13px] cursor-pointer">
+          <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} className="w-4 h-4 accent-[#F0A832]" />
+          Active
+        </label>
+      </div>
+      <footer className="border-t border-night-700 p-4 flex justify-end gap-2">
+        <button onClick={onCancel} className="btn btn-secondary">Cancel</button>
+        <button onClick={onSave} className="btn btn-primary">{mode === 'add' ? 'Create' : 'Save'}</button>
+      </footer>
+    </>
+  );
 }

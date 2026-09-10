@@ -21,9 +21,6 @@ export default defineConfig({
       output: {
         manualChunks: {
           react: ['react', 'react-dom', 'react-router-dom'],
-          charts: ['chart.js', 'react-chartjs-2', 'recharts'],
-          maps: ['leaflet', 'react-leaflet'],
-          motion: ['framer-motion'],
           query: ['@tanstack/react-query'],
         },
       },

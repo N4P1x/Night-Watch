@@ -1,175 +1,178 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import api from '../utils/api'
-import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import api from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/Toast';
+import { PageHeader, Section, EmptyState } from '../components/ui';
+import { PlusIcon, TrashIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 export default function Settings() {
-  const queryClient = useQueryClient()
-  const [newKeyword, setNewKeyword] = useState('')
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const [newKeyword, setNewKeyword] = useState('');
+  const [fullName, setFullName] = useState<string | null>(null);
 
-  const { data: userData } = useQuery({
+  const { data: userData, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['current-user'],
-    queryFn: async () => {
-      const response = await api.get('/v1/auth/me')
-      return response.data
-    },
-  })
+    queryFn: async () => (await api.get('/v1/auth/me')).data,
+  });
 
   const updateProfile = useMutation({
-    mutationFn: async (data: any) => {
-      await api.put('/v1/auth/me', data)
-    },
+    mutationFn: async (body: any) => (await api.put('/v1/auth/me', body)).data,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['current-user'] })
+      queryClient.invalidateQueries({ queryKey: ['current-user'] });
+      showToast('Settings saved.', 'success');
     },
-  })
+    onError: (e: any) => showToast('Save failed: ' + (e?.response?.data?.detail || e.message), 'error'),
+  });
 
-  const addKeyword = async () => {
-    if (newKeyword.trim()) {
-      const keywords = userData?.alert_keywords || []
-      await updateProfile.mutateAsync({ alert_keywords: [...keywords, newKeyword] })
-      setNewKeyword('')
+  const addKeyword = () => {
+    const kw = newKeyword.trim();
+    if (!kw) return;
+    const cur: string[] = userData?.alert_keywords ?? [];
+    if (cur.includes(kw)) {
+      showToast('Keyword already exists.', 'warning');
+      return;
     }
-  }
+    updateProfile.mutate({ alert_keywords: [...cur, kw] });
+    setNewKeyword('');
+  };
 
-  const removeKeyword = async (keyword: string) => {
-    const keywords = userData?.alert_keywords || []
-    await updateProfile.mutateAsync({ alert_keywords: keywords.filter((k: string) => k !== keyword) })
-  }
+  const removeKeyword = (kw: string) => {
+    const cur: string[] = userData?.alert_keywords ?? [];
+    updateProfile.mutate({ alert_keywords: cur.filter((k) => k !== kw) });
+  };
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-100">Settings</h1>
-        <p className="text-gray-500 mt-1">Manage your account and preferences</p>
-      </div>
+    <div className="min-h-full">
+      <PageHeader
+        eyebrow="System · Preferences"
+        title="Settings"
+        description={<>Signed in as <span className="font-mono text-ink-100">{user?.username}</span> · role <span className="badge badge-neutral ml-1">{userData?.role ?? user?.role}</span></>}
+        actions={
+          <button onClick={() => refetch()} disabled={isFetching} className="btn btn-secondary">
+            <ArrowPathIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+        }
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold text-gray-200 mb-4">Profile</h2>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                Username
-              </label>
-              <input
-                type="text"
-                className="input"
-                value={userData?.username || ''}
-                disabled
-              />
+      <div className="px-6 py-5 grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-[1200px]">
+        <Section title="Profile" hint="Username and email are managed by your admin.">
+          {isLoading ? (
+            <div className="space-y-3">
+              <div className="h-9 rounded-md bg-night-700 animate-pulse" />
+              <div className="h-9 rounded-md bg-night-700 animate-pulse" />
             </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                className="input"
-                value={userData?.email || ''}
-                disabled
-              />
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="nw-label">Username</label>
+                <input className="input font-mono opacity-60" value={userData?.username ?? ''} disabled />
+              </div>
+              <div>
+                <label className="nw-label">Email</label>
+                <input className="input opacity-60" value={userData?.email ?? ''} disabled />
+              </div>
+              <div>
+                <label className="nw-label" htmlFor="settings-fullname">Full name</label>
+                <input
+                  id="settings-fullname"
+                  className="input"
+                  defaultValue={userData?.full_name ?? ''}
+                  onChange={(e) => setFullName(e.target.value)}
+                  onBlur={() => {
+                    if (fullName !== null && fullName !== (userData?.full_name ?? '')) {
+                      updateProfile.mutate({ full_name: fullName });
+                    }
+                  }}
+                  placeholder="Jane Analyst"
+                />
+                <p className="nw-hint">Saved on blur.</p>
+              </div>
             </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                Full Name
-              </label>
-              <input
-                type="text"
-                className="input"
-                defaultValue={userData?.full_name || ''}
-                onBlur={(e) => updateProfile.mutate({ full_name: e.target.value })}
-              />
-            </div>
-          </div>
-        </div>
+          )}
+        </Section>
 
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold text-gray-200 mb-4">Alert Keywords</h2>
-          <p className="text-sm text-gray-500 mb-4">
-            Get notified when these keywords appear in new leaks
-          </p>
-          
-          <div className="flex gap-2 mb-4">
+        <Section title="Alert keywords" hint="Notified when these appear in new leaks.">
+          <div className="flex gap-2">
             <input
-              type="text"
-              className="input"
-              placeholder="Add keyword..."
+              className="input font-mono"
+              placeholder="e.g. lockbit, CVE-2024-, .onion"
               value={newKeyword}
               onChange={(e) => setNewKeyword(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && addKeyword()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') addKeyword();
+              }}
             />
-            <button onClick={addKeyword} className="btn btn-primary">
-              <PlusIcon className="w-5 h-5" />
+            <button onClick={addKeyword} className="btn btn-primary flex-shrink-0" aria-label="Add keyword">
+              <PlusIcon className="w-4 h-4" /> Add
             </button>
           </div>
-          
-          <div className="flex flex-wrap gap-2">
-            {userData?.alert_keywords?.map((keyword: string) => (
-              <span
-                key={keyword}
-                className="inline-flex items-center gap-1 px-3 py-1 bg-accent-primary/10 border border-accent-primary/30 rounded-full text-sm text-accent-primary"
-              >
-                {keyword}
-                <button
-                  onClick={() => removeKeyword(keyword)}
-                  className="hover:text-red-400 transition-colors"
-                >
-                  <TrashIcon className="w-4 h-4" />
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {(userData?.alert_keywords ?? []).map((kw: string) => (
+              <span key={kw} className="badge badge-brand !normal-case !tracking-normal font-mono">
+                {kw}
+                <button onClick={() => removeKeyword(kw)} className="hover:text-sev-critical ml-0.5" aria-label={`Remove ${kw}`}>
+                  <TrashIcon className="w-3.5 h-3.5" />
                 </button>
               </span>
             ))}
-            {(!userData?.alert_keywords || userData.alert_keywords.length === 0) && (
-              <p className="text-sm text-gray-500">No keywords configured</p>
+            {!(userData?.alert_keywords ?? []).length && (
+              <p className="text-[13px] text-ink-500">No keywords yet — add one above.</p>
             )}
           </div>
-        </div>
+        </Section>
 
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold text-gray-200 mb-4">Notifications</h2>
-          
-          <div className="space-y-4">
-            <label className="flex items-center justify-between">
-              <span className="text-gray-400">Email notifications</span>
-              <input type="checkbox" className="toggle" defaultChecked />
-            </label>
-            
-            <label className="flex items-center justify-between">
-              <span className="text-gray-400">Browser notifications</span>
-              <input type="checkbox" className="toggle" />
-            </label>
-            
-            <label className="flex items-center justify-between">
-              <span className="text-gray-400">Daily digest</span>
-              <input type="checkbox" className="toggle" defaultChecked />
-            </label>
-          </div>
-        </div>
+        <Section title="Notifications" hint="Local browser preferences for this device.">
+          <NotifRow id="nw-n-email" label="Email notifications" desc="Critical alerts via SMTP, if configured." defaultOn />
+          <NotifRow id="nw-n-push" label="Live toasts" desc="In-app toasts for leaks and alerts." defaultOn />
+          <NotifRow id="nw-n-digest" label="Daily digest" desc="One summary email per day." defaultOn={false} />
+        </Section>
 
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold text-gray-200 mb-4">System Info</h2>
-          
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Version</span>
-              <span className="text-gray-300">1.0.0</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Role</span>
-              <span className="text-gray-300">{userData?.role || 'viewer'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Last login</span>
-              <span className="text-gray-300">
-                {userData?.last_login ? new Date(userData.last_login).toLocaleString() : 'N/A'}
-              </span>
-            </div>
-          </div>
-        </div>
+        <Section title="System" hint="Build and session info.">
+          <dl className="divide-y divide-night-700/70">
+            {[
+              ['Version', 'v1.0.0'],
+              ['Role', userData?.role ?? user?.role ?? '—'],
+              ['Last login', userData?.last_login ? new Date(userData.last_login).toLocaleString() : '—'],
+              ['API base', '/api · WS /ws'],
+            ].map(([k, v]) => (
+              <div key={k} className="flex justify-between py-2.5 text-[13px]">
+                <dt className="text-ink-500">{k}</dt>
+                <dd className="text-ink-100 font-mono">{v}</dd>
+              </div>
+            ))}
+          </dl>
+          {!(userData?.alert_keywords ?? []).length && <div className="hidden" />}
+          {!userData && !isLoading && <EmptyState title="Could not load profile" hint="Retry from the header." />}
+        </Section>
       </div>
     </div>
-  )
+  );
+}
+
+function NotifRow({ id, label, desc, defaultOn }: { id: string; label: string; desc: string; defaultOn?: boolean }) {
+  const [on, setOn] = useState(() => {
+    const saved = localStorage.getItem(id);
+    return saved === null ? !!defaultOn : saved === '1';
+  });
+  return (
+    <label className="flex items-center justify-between gap-4 py-2.5 border-b border-night-700/70 last:border-0 cursor-pointer">
+      <span>
+        <span className="block text-[13px] text-white font-medium">{label}</span>
+        <span className="block text-[12px] text-ink-500">{desc}</span>
+      </span>
+      <input
+        type="checkbox"
+        checked={on}
+        onChange={(e) => {
+          setOn(e.target.checked);
+          localStorage.setItem(id, e.target.checked ? '1' : '0');
+        }}
+        className="w-4 h-4 accent-[#F0A832]"
+        aria-label={label}
+      />
+    </label>
+  );
 }
