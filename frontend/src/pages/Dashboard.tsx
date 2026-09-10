@@ -1,606 +1,377 @@
-import { useState, useEffect, useMemo } from 'react'
-import { useAuth } from '../contexts/AuthContext'
-import { useQuery } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
-import api from '../utils/api'
-import { useToast } from '../components/Toast'
+import { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import api from '../utils/api';
+import { useToast } from '../components/Toast';
+import { PageHeader, Section, Stat, SeverityPill, StatusDot, EmptyState, SkeletonRows } from '../components/ui';
+import { SEVERITY_ORDER, SEVERITY_HEX, SEVERITY_BAR, normalizeSeverity } from '../utils/severity';
 import {
-  ShieldExclamationIcon,
-  UserGroupIcon,
-  CircleStackIcon,
-  BellIcon,
   PlayIcon,
   StopIcon,
-  LockClosedIcon,
-  GlobeAltIcon,
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  ArrowRightIcon,
-  CpuChipIcon,
-  ServerIcon,
-  FingerPrintIcon,
-  EyeIcon,
-  ShieldCheckIcon,
-  FireIcon,
-  ClockIcon,
-  KeyIcon,
-  SignalIcon,
-  SparklesIcon,
   ArrowPathIcon,
-  ServerStackIcon
-} from '@heroicons/react/24/outline'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
-
-const severityColors: Record<string, string> = {
-  critical: '#ef4444',
-  high: '#f97316',
-  medium: '#eab308',
-  low: '#22c55e'
-}
-
-const severityBgColors: Record<string, string> = {
-  critical: 'bg-red-500/10 border-red-500/30',
-  high: 'bg-orange-500/10 border-orange-500/30',
-  medium: 'bg-yellow-500/10 border-yellow-500/30',
-  low: 'bg-green-500/10 border-green-500/30'
-}
+  ArrowRightIcon,
+} from '@heroicons/react/24/outline';
 
 interface ScrapeStatus {
-  status: string
-  progress: number
-  total: number
-  success: number
-  failed: number
-  current_url: string
-  logs: string[]
-  start_time?: string
-  end_time?: string
+  status: string;
+  progress: number;
+  total: number;
+  success: number;
+  failed: number;
+  current_url: string;
 }
 
-interface StatCardProps {
-  title: string
-  value: number | string
-  subtitle?: string
-  icon: React.ElementType
-  color: string
-  trend?: { value: number; positive: boolean }
-  onClick?: () => void
-}
-
-function StatCard({ title, value, subtitle, icon: Icon, color, trend, onClick }: StatCardProps) {
-  return (
-    <div
-      onClick={onClick}
-      className={`relative overflow-hidden rounded-2xl bg-dark-700/50 backdrop-blur-sm border border-dark-600 p-6 transition-all duration-300 hover:border-dark-500 hover:shadow-xl hover:shadow-${color}/5 cursor-pointer group`}
-    >
-      <div className={`absolute inset-0 bg-gradient-to-br from-${color}/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity`} />
-      <div className="relative">
-        <div className="flex items-center justify-between mb-4">
-          <div className={`p-3 rounded-xl bg-${color}/10`}>
-            <Icon className={`w-6 h-6 text-${color}`} />
-          </div>
-          {trend && (
-            <span className={`text-sm font-medium ${trend.positive ? 'text-green-400' : 'text-red-400'}`}>
-              {trend.positive ? '+' : ''}{trend.value}%
-            </span>
-          )}
-        </div>
-        <p className="text-3xl font-bold text-white mb-1">{value}</p>
-        <p className="text-sm text-gray-400">{title}</p>
-        {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
-      </div>
-    </div>
-  )
-}
-
-interface SeverityBadgeProps {
-  severity: string
-  count: number
-  total: number
-}
-
-function SeverityBadge({ severity, count, total }: SeverityBadgeProps) {
-  const color = severityColors[severity]
-  const percentage = total > 0 ? (count / total * 100).toFixed(1) : '0'
-  
-  return (
-    <div className="flex items-center gap-4 p-3 rounded-xl bg-dark-700/30 border border-dark-600">
-      <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${color}15` }}>
-        <FireIcon className="w-6 h-6" style={{ color }} />
-      </div>
-      <div className="flex-1">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-sm font-medium text-white capitalize">{severity}</span>
-          <span className="text-sm font-bold" style={{ color }}>{count}</span>
-        </div>
-        <div className="h-2 bg-dark-700 rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${percentage}%`, backgroundColor: color }}
-          />
-        </div>
-      </div>
-      <span className="text-xs text-gray-500 w-12 text-right">{percentage}%</span>
-    </div>
-  )
+function formatTime(d: Date) {
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate()
-  const { user } = useAuth()
-  const { showToast } = useToast()
-  const [scrapeStatus, setScrapeStatus] = useState<ScrapeStatus | null>(null)
-  const [isScraping, setIsScraping] = useState(false)
-  const [currentTime, setCurrentTime] = useState(new Date())
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const [scrapeStatus, setScrapeStatus] = useState<ScrapeStatus | null>(null);
+  const [isScraping, setIsScraping] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const isAdmin = user?.role === 'admin';
 
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
-    return () => clearInterval(timer)
-  }, [])
-
-  const { data: stats, isLoading: statsLoading, refetch } = useQuery({
+  const { data: stats, isLoading: statsLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
-      const response = await api.get('/v1/stats/dashboard')
-      setLastUpdated(new Date())
-      return response.data
+      const response = await api.get('/v1/stats/dashboard');
+      setLastUpdated(new Date());
+      return response.data;
     },
     refetchInterval: 30000,
-  })
+  });
 
   const { data: recentLeaks } = useQuery({
     queryKey: ['recent-leaks'],
     queryFn: async () => {
-      const response = await api.get('/v1/leaks', { params: { limit: 5 } })
-      return response.data
+      const response = await api.get('/v1/leaks', { params: { limit: 5 } });
+      return response.data;
     },
-  })
+  });
 
   const { data: actorsData } = useQuery({
     queryKey: ['top-actors'],
     queryFn: async () => {
-      const response = await api.get('/v1/threat-actors', { params: { limit: 10 } })
-      return response.data
+      const response = await api.get('/v1/threat-actors', { params: { limit: 6 } });
+      return response.data;
     },
-  })
+  });
 
   useEffect(() => {
-    const checkScrapeStatus = async () => {
+    if (!isScraping) return;
+    let alive = true;
+    const check = async () => {
       try {
-        const response = await api.get('/v1/scrape/status')
-        const status = response.data
-        setScrapeStatus(status)
-        setIsScraping(status.status === 'running' || status.status === 'starting')
+        const response = await api.get('/v1/scrape/status');
+        if (!alive) return;
+        setScrapeStatus(response.data);
+        const s = String(response.data?.status ?? '');
+        setIsScraping(s === 'running' || s === 'starting');
       } catch {
-        console.error('Failed to get scrape status')
+        /* keep previous state; status endpoint is best-effort */
       }
-    }
-
-    if (isScraping) {
-      checkScrapeStatus()
-      const interval = setInterval(checkScrapeStatus, 3000)
-      return () => clearInterval(interval)
-    }
-  }, [isScraping])
+    };
+    check();
+    const t = setInterval(check, 3000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [isScraping]);
 
   const handleStartScrape = async () => {
-    showToast('Starting Tor scraper...', 'info')
-    setIsScraping(true)
+    setIsScraping(true);
     try {
-      const response = await api.post('/v1/scrape/trigger')
-      if (response.data.status === 'started') {
-        showToast('Scraping via Tor! Watch the progress below.', 'success')
-      }
+      await api.post('/v1/scrape/trigger');
+      showToast('Scrape started via Tor.', 'success');
     } catch (err: any) {
-      showToast('Failed to start scrape: ' + (err.message || 'Unknown'), 'error')
-      setIsScraping(false)
+      showToast('Failed to start scrape: ' + (err?.response?.data?.detail || err.message || 'Unknown'), 'error');
+      setIsScraping(false);
     }
-  }
+  };
 
   const handleStopScrape = async () => {
     try {
-      await api.post('/v1/scrape/stop')
-      showToast('Scrape stopped', 'warning')
-      setIsScraping(false)
+      await api.post('/v1/scrape/stop');
+      showToast('Scrape stop requested.', 'warning');
+      setIsScraping(false);
     } catch {
-      showToast('Failed to stop scrape', 'error')
+      showToast('Failed to stop scrape.', 'error');
     }
-  }
+  };
 
-  const severityBreakdown: Record<string, number> = stats?.leaks?.by_severity || {}
-  const totalLeaks = Object.values(severityBreakdown).reduce((a, b) => a + b, 0)
-
-  const progress = scrapeStatus?.total ? Math.min(Math.max((scrapeStatus.progress / scrapeStatus.total) * 100, 0), 100) : 0
-
-  if (statsLoading) {
-    return (
-      <div className="min-h-screen bg-dark-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative w-20 h-20 mx-auto mb-6">
-            <div className="absolute inset-0 border-4 border-dark-600 rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-accent-primary rounded-full animate-spin" style={{ borderRightColor: 'transparent', borderBottomColor: 'transparent' }}></div>
-          </div>
-          <p className="text-gray-400 text-lg">Loading threat intelligence...</p>
-          <p className="text-gray-500 text-sm mt-2">Connecting to data sources</p>
-        </div>
-      </div>
-    )
-  }
+  const severityBreakdown: Record<string, number> = stats?.leaks?.by_severity || {};
+  const totalLeaks = Object.values(severityBreakdown).reduce((a, b) => a + (Number(b) || 0), 0);
+  const progress =
+    scrapeStatus && scrapeStatus.total > 0
+      ? Math.min(Math.max((scrapeStatus.progress / scrapeStatus.total) * 100, 0), 100)
+      : 0;
 
   return (
-    <div className="min-h-screen bg-dark-900">
-      {/* Header */}
-      <header className="border-b border-dark-700 bg-dark-800/50 backdrop-blur-sm sticky top-0 z-50">
-        {user?.role !== 'admin' && (
-          <div className={`py-1 px-6 text-center text-[10px] font-bold uppercase tracking-widest ${
-            user?.role === 'analyst' ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'
-          }`}>
-            {user?.role} Panel - Restricted Access
-          </div>
-        )}
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                <div className={`p-2 rounded-xl bg-gradient-to-br ${
-                  user?.role === 'admin' ? 'from-indigo-500 to-purple-600' : 
-                  user?.role === 'analyst' ? 'from-purple-500 to-pink-600' : 'from-blue-500 to-cyan-600'
-                }`}>
-                  <ShieldExclamationIcon className="w-6 h-6 text-white" />
-                </div>
-                {user?.role === 'admin' ? 'Admin Intelligence' : 
-                 user?.role === 'analyst' ? 'Analyst Intelligence' : 'Security Monitor'}
-              </h1>
-              <p className="text-gray-400 text-sm mt-1 flex items-center gap-2">
-                <LockClosedIcon className="w-4 h-4 text-purple-400" />
-                {user?.role === 'viewer' ? 'Read-only security data' : 'Real-time dark web monitoring'}
-                <span className="text-gray-500">•</span>
-                <span className="text-xs">Last updated: {lastUpdated.toLocaleTimeString()}</span>
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right hidden md:block">
-                <p className="text-xs text-gray-500">{currentTime.toLocaleDateString()}</p>
-                <p className="text-lg font-mono text-gray-300">{currentTime.toLocaleTimeString()}</p>
-              </div>
-              <button
-                onClick={() => refetch()}
-                className="p-2 rounded-lg bg-dark-700 hover:bg-dark-600 transition-colors"
-                title="Refresh data"
-              >
-                <ArrowPathIcon className="w-5 h-5 text-gray-400" />
-              </button>
-              
-              {user?.role === 'admin' && (
-                !isScraping ? (
-                  <button
-                    onClick={handleStartScrape}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 transition-opacity shadow-lg shadow-indigo-500/20"
-                  >
-                    <PlayIcon className="w-5 h-5" />
-                    Start Scrape
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleStopScrape}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl font-medium hover:bg-red-500/20 transition-colors"
-                  >
-                    <StopIcon className="w-5 h-5" />
-                    Stop Scrape
-                  </button>
-                )
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-full">
+      <PageHeader
+        eyebrow={isAdmin ? 'Operations · Admin' : `Operations · ${user?.role ?? 'Viewer'}`}
+        title="Operations overview"
+        description={
+          <>
+            Live dark-web posture at a glance. Last sync{' '}
+            <span className="font-mono text-ink-100 tabular-nums">{formatTime(lastUpdated)}</span>
+            {user?.role === 'viewer' && ' · read-only role'}.
+          </>
+        }
+        actions={
+          <>
+            <button onClick={() => refetch()} disabled={isFetching} className="btn btn-secondary" title="Refresh">
+              <ArrowPathIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+            {isAdmin &&
+              (!isScraping ? (
+                <button onClick={handleStartScrape} className="btn btn-primary">
+                  <PlayIcon className="w-4 h-4" />
+                  Start scrape
+                </button>
+              ) : (
+                <button onClick={handleStopScrape} className="btn btn-danger">
+                  <StopIcon className="w-4 h-4" />
+                  Stop
+                </button>
+              ))}
+          </>
+        }
+      />
 
-      <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        {/* Live Scrape Progress */}
+      <div className="px-6 py-5 space-y-5 max-w-[1440px]">
         {isScraping && scrapeStatus && (
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/10 border border-indigo-500/20 p-6">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-dark-700">
-              <div
-                className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-500"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <div className="w-14 h-14 rounded-xl bg-indigo-500/20 flex items-center justify-center">
-                    <LockClosedIcon className="w-7 h-7 text-indigo-400" />
-                  </div>
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-dark-800 animate-pulse" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                    Tor Scrape in Progress
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
-                    </span>
-                  </h3>
-                  <p className="text-sm text-gray-400">
-                    {scrapeStatus.progress} of {scrapeStatus.total} sources • {scrapeStatus.success} successful, {scrapeStatus.failed} failed
-                  </p>
-                </div>
+          <div className="nw-panel p-4" role="status">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <StatusDot state="degraded" label="Scraping via Tor" />
+                <span className="nw-mono text-ink-400 truncate max-w-[420px]">
+                  {scrapeStatus.current_url || 'initializing…'}
+                </span>
               </div>
-              <div className="text-right">
-                <p className="text-3xl font-bold text-indigo-400">{Math.round(progress)}%</p>
-                <p className="text-xs text-gray-500">Complete</p>
-              </div>
-            </div>
-            <div className="bg-dark-900/50 rounded-xl p-3 border border-dark-700 font-mono text-xs">
-              <span className="text-gray-500">Current:</span>{' '}
-              <span className="text-indigo-400 truncate max-w-md inline-block align-bottom">
-                {scrapeStatus.current_url || 'Initializing...'}
+              <span className="font-mono text-[13px] text-white tabular-nums">
+                {scrapeStatus.progress}/{scrapeStatus.total} · {Math.round(progress)}% · {scrapeStatus.success} ok / {scrapeStatus.failed} fail
               </span>
             </div>
+            <div className="mt-3 h-1.5 rounded-full bg-night-950 overflow-hidden">
+              <div className="h-full bg-brand transition-all duration-500" style={{ width: `${progress}%` }} />
+            </div>
           </div>
         )}
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard
-            title="Total Leaks"
-            value={stats?.leaks?.total || 0}
-            subtitle={`${stats?.leaks?.new_today || 0} new today`}
-            icon={ShieldExclamationIcon}
-            color="blue-400"
-            onClick={() => navigate('/leaks')}
-          />
-          <StatCard
-            title="Threat Actors"
-            value={stats?.threat_actors?.total || 0}
-            subtitle={`${stats?.threat_actors?.active || 0} active`}
-            icon={UserGroupIcon}
-            color="purple-400"
-            onClick={() => navigate('/actors')}
-          />
-          <StatCard
-            title="IOCs Collected"
-            value={stats?.iocs?.total || 0}
-            subtitle="Indicators of compromise"
-            icon={CircleStackIcon}
-            color="green-400"
-            onClick={() => navigate('/iocs')}
-          />
-          <StatCard
-            title="Active Sources"
-            value={stats?.sources?.active || 0}
-            subtitle="Dark web monitoring"
-            icon={GlobeAltIcon}
-            color="yellow-400"
-            onClick={() => navigate('/sources')}
-          />
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Severity Distribution */}
-          <div className="lg:col-span-2 rounded-2xl bg-dark-700/50 border border-dark-600 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <ExclamationTriangleIcon className="w-5 h-5 text-red-400" />
-                Severity Distribution
-              </h2>
-              <span className="text-sm text-gray-400">{totalLeaks} total leaks</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {Object.entries(severityBreakdown).map(([severity, count]) => (
-                <SeverityBadge
-                  key={severity}
-                  severity={severity}
-                  count={count as number}
-                  total={totalLeaks}
-                />
-              ))}
-            </div>
-            <div className="mt-6 pt-4 border-t border-dark-600 grid grid-cols-4 gap-4 text-center">
-              <div>
-                <p className="text-2xl font-bold text-red-400">{severityBreakdown.critical || 0}</p>
-                <p className="text-xs text-gray-500">Critical</p>
+        {statsLoading ? (
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="nw-panel p-4">
+                <div className="h-3 w-20 rounded bg-night-700 animate-pulse" />
+                <div className="h-8 w-16 rounded bg-night-700 animate-pulse mt-2" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-orange-400">{severityBreakdown.high || 0}</p>
-                <p className="text-xs text-gray-500">High</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-yellow-400">{severityBreakdown.medium || 0}</p>
-                <p className="text-xs text-gray-500">Medium</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-green-400">{severityBreakdown.low || 0}</p>
-                <p className="text-xs text-gray-500">Low</p>
-              </div>
-            </div>
+            ))}
           </div>
-
-          {/* Threat Actors */}
-          <div className="rounded-2xl bg-dark-700/50 border border-dark-600 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <UserGroupIcon className="w-5 h-5 text-purple-400" />
-                Threat Actors
-              </h2>
-              <button
-                onClick={() => navigate('/actors')}
-                className="text-sm text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
-              >
-                View All <ArrowRightIcon className="w-4 h-4" />
+        ) : isError ? (
+          <EmptyState
+            title="Could not load dashboard stats"
+            hint="API /v1/stats/dashboard failed. Check backend, then retry."
+            action={
+              <button onClick={() => refetch()} className="btn btn-secondary">
+                Retry
               </button>
-            </div>
-            <div className="space-y-3">
-              {actorsData?.actors?.slice(0, 5).map((actor: any) => (
-                <div
-                  key={actor.id}
-                  onClick={() => navigate('/actors')}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-dark-800/50 border border-dark-600 hover:border-dark-500 transition-colors cursor-pointer"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/10 flex items-center justify-center">
-                    <UserGroupIcon className="w-5 h-5 text-purple-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{actor.name}</p>
-                    <p className="text-xs text-gray-500 capitalize">{actor.risk_level || 'medium'} risk</p>
-                  </div>
-                  {actor.is_active ? (
-                    <span className="px-2 py-1 rounded-lg text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30">
-                      Active
-                    </span>
-                  ) : (
-                    <span className="px-2 py-1 rounded-lg text-xs font-medium bg-gray-500/20 text-gray-400 border border-gray-500/30">
-                      Inactive
-                    </span>
-                  )}
-                </div>
-              ))}
-              {(!actorsData?.actors || actorsData.actors.length === 0) && (
-                <div className="text-center py-8 text-gray-500">
-                  <UserGroupIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No threat actors tracked yet</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Leaks */}
-          <div className="rounded-2xl bg-dark-700/50 border border-dark-600 overflow-hidden">
-            <div className="p-4 border-b border-dark-600 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-              <ServerStackIcon className="w-5 h-5 text-green-400" />
-              System Status
-            </h2>
-              <button
-                onClick={() => navigate('/leaks')}
-                className="text-sm text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
-              >
-                View All <ArrowRightIcon className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="divide-y divide-dark-600">
-              {recentLeaks?.leaks?.slice(0, 5).map((leak: any) => (
-                <div
-                  key={leak.id}
-                  onClick={() => navigate('/leaks')}
-                  className="p-4 hover:bg-dark-600/30 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-4">
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: severityColors[leak.severity] || '#6b7280' }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white truncate">{leak.title}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {leak.victim_name || 'Unknown'} • {new Date(leak.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <span
-                      className="px-3 py-1 rounded-lg text-xs font-bold uppercase"
-                      style={{
-                        backgroundColor: `${severityColors[leak.severity]}15`,
-                        color: severityColors[leak.severity],
-                        border: `1px solid ${severityColors[leak.severity]}30`
-                      }}
-                    >
-                      {leak.severity}
-                    </span>
-                  </div>
-                </div>
-              ))}
-              {(!recentLeaks?.leaks || recentLeaks.leaks.length === 0) && (
-                <div className="p-12 text-center text-gray-500">
-                  <ShieldExclamationIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No leaks detected yet</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* System Status */}
-          <div className="rounded-2xl bg-dark-700/50 border border-dark-600 p-6">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-6">
-              <SignalIcon className="w-5 h-5 text-green-400" />
-              System Status
-            </h2>
-            <div className="space-y-4">
-              {[
-                { name: 'API Server', status: 'online', color: 'green' },
-                { name: 'Tor Network', status: isScraping ? 'scraping' : 'connected', color: isScraping ? 'yellow' : 'green' },
-                { name: 'Database', status: 'connected', color: 'green' },
-                { name: 'Scraper', status: isScraping ? 'running' : 'idle', color: isScraping ? 'yellow' : 'gray' },
-              ].map(({ name, status, color }) => (
-                <div key={name} className="flex items-center justify-between p-3 rounded-xl bg-dark-800/50 border border-dark-600">
-                  <span className="text-sm text-white">{name}</span>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full bg-${color}-500 ${color === 'yellow' ? 'animate-pulse' : ''}`} />
-                    <span className={`text-sm font-medium text-${color}-400 capitalize`}>{status}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-6 pt-4 border-t border-dark-600">
-              <div className="grid grid-cols-2 gap-4 text-center">
-                <div className="p-4 rounded-xl bg-dark-800/50 border border-dark-600">
-                  <p className="text-2xl font-bold text-white">{stats?.leaks?.total || 0}</p>
-                  <p className="text-xs text-gray-500">Total Data</p>
-                </div>
-                <div className="p-4 rounded-xl bg-dark-800/50 border border-dark-600">
-                  <p className="text-2xl font-bold text-white">{stats?.iocs?.total || 0}</p>
-                  <p className="text-xs text-gray-500">IOCs</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="rounded-2xl bg-dark-700/50 border border-dark-600 p-6">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
-            <SparklesIcon className="w-5 h-5 text-yellow-400" />
-            Quick Actions
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {user?.role === 'admin' && (
-              <button
-                onClick={handleStartScrape}
-                disabled={isScraping}
-                className="flex items-center justify-center gap-2 p-4 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-400 hover:border-indigo-500/50 hover:from-indigo-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <CpuChipIcon className="w-5 h-5" />
-                <span className="font-medium">{isScraping ? 'Scraping...' : 'Start Scrape'}</span>
-              </button>
-            )}
-            <button
+            }
+          />
+        ) : (
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            <Stat
+              label="Total leaks"
+              value={(stats?.leaks?.total ?? 0).toLocaleString()}
+              sub={`${stats?.leaks?.new_today ?? 0} new today`}
+              accent="critical"
               onClick={() => navigate('/leaks')}
-              className="flex items-center justify-center gap-2 p-4 rounded-xl bg-dark-800/50 border border-dark-600 text-gray-300 hover:border-dark-500 hover:text-white transition-all"
-            >
-              <ShieldExclamationIcon className="w-5 h-5" />
-              <span>View Leaks</span>
-            </button>
-            <button
+            />
+            <Stat
+              label="Threat actors"
+              value={(stats?.threat_actors?.total ?? 0).toLocaleString()}
+              sub={`${stats?.threat_actors?.active ?? 0} active`}
+              accent="high"
+              onClick={() => navigate('/actors')}
+            />
+            <Stat
+              label="IOCs"
+              value={(stats?.iocs?.total ?? 0).toLocaleString()}
+              sub="Indicators of compromise"
+              accent="medium"
               onClick={() => navigate('/iocs')}
-              className="flex items-center justify-center gap-2 p-4 rounded-xl bg-dark-800/50 border border-dark-600 text-gray-300 hover:border-dark-500 hover:text-white transition-all"
-            >
-              <KeyIcon className="w-5 h-5" />
-              <span>Analyze IOCs</span>
-            </button>
-            <button
-              onClick={() => navigate('/alerts')}
-              className="flex items-center justify-center gap-2 p-4 rounded-xl bg-dark-800/50 border border-dark-600 text-gray-300 hover:border-dark-500 hover:text-white transition-all"
-            >
-              <BellIcon className="w-5 h-5" />
-              <span>View Alerts</span>
-            </button>
+            />
+            <Stat
+              label="Active sources"
+              value={(stats?.sources?.active ?? 0).toLocaleString()}
+              sub="Tor + clearnet feeds"
+              accent="low"
+              onClick={() => navigate('/sources')}
+            />
           </div>
+        )}
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <Section
+            title="Severity distribution"
+            hint={`${totalLeaks.toLocaleString()} leaks total`}
+            className="xl:col-span-2"
+            action={
+              <button onClick={() => navigate('/leaks')} className="btn btn-ghost !px-2 !py-1 text-[12.5px]">
+                Open leaks <ArrowRightIcon className="w-3.5 h-3.5" />
+              </button>
+            }
+          >
+            {totalLeaks === 0 ? (
+              <EmptyState title="No leaks yet" hint="Run a scrape to populate severity breakdown." />
+            ) : (
+              <div className="space-y-2.5">
+                {SEVERITY_ORDER.map((sev) => {
+                  const count = Number(severityBreakdown[sev] ?? 0);
+                  const pct = totalLeaks > 0 ? (count / totalLeaks) * 100 : 0;
+                  return (
+                    <div key={sev} className="flex items-center gap-3">
+                      <span className="w-16 flex-shrink-0">
+                        <SeverityPill value={sev} />
+                      </span>
+                      <div className="flex-1 h-2 rounded-full bg-night-950 overflow-hidden border border-night-700">
+                        <div className={`h-full ${SEVERITY_BAR[sev]}`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="w-20 text-right font-mono text-[12.5px] tabular-nums" style={{ color: SEVERITY_HEX[sev] }}>
+                        {count}
+                      </span>
+                      <span className="w-12 text-right font-mono text-[11.5px] text-ink-500 tabular-nums">{pct.toFixed(1)}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Section>
+
+          <Section
+            title="Top threat actors"
+            hint="By recent activity"
+            action={
+              <button onClick={() => navigate('/actors')} className="btn btn-ghost !px-2 !py-1 text-[12.5px]">
+                View all <ArrowRightIcon className="w-3.5 h-3.5" />
+              </button>
+            }
+          >
+            {!actorsData?.actors || actorsData.actors.length === 0 ? (
+              <EmptyState title="No actors tracked" hint="Actors appear after the first successful scrape." />
+            ) : (
+              <ul className="divide-y divide-night-700/70 -m-4">
+                {actorsData.actors.slice(0, 6).map((actor: any) => (
+                  <li key={actor.id}>
+                    <button onClick={() => navigate('/actors')} className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.02]">
+                      <span className="w-8 h-8 rounded-md bg-night-950 border border-night-700 flex items-center justify-center font-mono text-[12px] font-bold text-ink-100 flex-shrink-0">
+                        {String(actor.name ?? '?').slice(0, 1).toUpperCase()}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13px] font-semibold text-white truncate">{actor.name}</span>
+                        <span className="block text-[11.5px] text-ink-500 capitalize">{actor.risk_level || 'medium'} risk</span>
+                      </span>
+                      <span className={`badge ${actor.is_active ? 'badge-low' : 'badge-neutral'}`}>
+                        {actor.is_active ? 'Active' : 'Idle'}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
         </div>
-      </main>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <Section
+            title="Recent leaks"
+            hint="Latest 5 · click to investigate"
+            className="xl:col-span-2 !p-0 overflow-hidden"
+            action={
+              <button onClick={() => navigate('/leaks')} className="btn btn-ghost !px-2 !py-1 text-[12.5px]">
+                View all <ArrowRightIcon className="w-3.5 h-3.5" />
+              </button>
+            }
+          >
+            {!recentLeaks?.leaks || recentLeaks.leaks.length === 0 ? (
+              <div className="p-4">
+                <EmptyState title="No leaks detected" hint="Start a scrape to collect the first batch." />
+              </div>
+            ) : (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Severity</th>
+                    <th>Title</th>
+                    <th>Victim</th>
+                    <th className="text-right">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentLeaks.leaks.slice(0, 5).map((leak: any) => {
+                    const sev = normalizeSeverity(leak.severity);
+                    return (
+                      <tr key={leak.id} onClick={() => navigate('/leaks')} className="cursor-pointer">
+                        <td>
+                          <SeverityPill value={sev} />
+                        </td>
+                        <td className="max-w-[320px]">
+                          <span className="block truncate text-white font-medium">{leak.title}</span>
+                        </td>
+                        <td className="text-ink-400 truncate max-w-[160px]">{leak.victim_name || '—'}</td>
+                        <td className="text-right font-mono text-[12px] text-ink-500 whitespace-nowrap">
+                          {leak.created_at ? new Date(leak.created_at).toLocaleDateString() : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </Section>
+
+          <Section title="System status" hint="Best-effort local checks">
+            <ul className="space-y-2.5">
+              <li className="flex items-center justify-between nw-inset px-3 py-2.5">
+                <span className="text-[13px] text-white">API server</span>
+                <StatusDot state="online" label="Online" />
+              </li>
+              <li className="flex items-center justify-between nw-inset px-3 py-2.5">
+                <span className="text-[13px] text-white">Tor circuit</span>
+                <StatusDot state={isScraping ? 'degraded' : 'online'} label={isScraping ? 'Scraping' : 'Ready'} />
+              </li>
+              <li className="flex items-center justify-between nw-inset px-3 py-2.5">
+                <span className="text-[13px] text-white">Scheduler</span>
+                <StatusDot state={isScraping ? 'degraded' : 'offline'} label={isScraping ? 'Running' : 'Idle'} />
+              </li>
+            </ul>
+            <div className="grid grid-cols-2 gap-2.5 mt-3">
+              <div className="nw-inset p-3 text-center">
+                <p className="text-[20px] font-semibold tabular-nums">{stats?.leaks?.total ?? 0}</p>
+                <p className="nw-eyebrow mt-0.5">Records</p>
+              </div>
+              <div className="nw-inset p-3 text-center">
+                <p className="text-[20px] font-semibold tabular-nums">{stats?.iocs?.total ?? 0}</p>
+                <p className="nw-eyebrow mt-0.5">IOCs</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-4">
+              <button onClick={() => navigate('/leaks')} className="btn btn-secondary flex-1">
+                View leaks
+              </button>
+              <button onClick={() => navigate('/alerts')} className="btn btn-secondary flex-1">
+                View alerts
+              </button>
+            </div>
+          </Section>
+        </div>
+      </div>
     </div>
-  )
+  );
 }

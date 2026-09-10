@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import api from '../utils/api'
 import { useToast } from '../components/Toast'
 import { 
@@ -50,7 +51,8 @@ function truncateText(text: string, maxLength: number): string {
 }
 
 export default function Leaks() {
-  const [search, setSearch] = useState('')
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [severity, setSeverity] = useState<string>('')
   const [isOnion, setIsOnion] = useState<boolean | null>(null)
   const [page, setPage] = useState(0)
@@ -61,6 +63,12 @@ export default function Leaks() {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   const LIMIT = 15
+
+  useEffect(() => {
+    const q = searchParams.get('q') ?? '';
+    setSearch(q);
+    setPage(0);
+  }, [searchParams])
 
   const { data, isLoading, refetch } = useQuery<LeaksResponse>({
     queryKey: ['leaks', search, severity, isOnion, page, sortBy],
@@ -115,7 +123,7 @@ export default function Leaks() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `dwtip-leaks-${new Date().toISOString().split('T')[0]}.csv`
+    a.download = `night-watch-leaks-${new Date().toISOString().split('T')[0]}.csv`
     a.click()
     showToast('Intelligence report exported', 'success')
   }
@@ -263,9 +271,9 @@ export default function Leaks() {
                     onClick={() => setSelectedLeak(leak)}
                     className="group relative rounded-[2rem] bg-dark-800/40 border border-dark-700 hover:border-dark-500 p-7 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-indigo-500/5 cursor-pointer overflow-hidden"
                   >
-                    {/* Visual indicators */}
-                    <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-${config.color}/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity`} />
-                    <div className={`absolute top-7 right-7 w-2 h-2 rounded-full ${config.glow} animate-pulse`} style={{ backgroundColor: config.color }} />
+                    {/* Visual indicators — static style, no dynamic Tailwind */}
+                    <div className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: `radial-gradient(circle at top right, ${config.color}1a, transparent 70%)` }} />
+                    <div className="absolute top-7 right-7 w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: config.color }} />
                     
                     <div className="relative space-y-6">
                       <div className="flex items-start justify-between">

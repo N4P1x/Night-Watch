@@ -152,8 +152,8 @@ export default function Alerts() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-100 flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-yellow-500/20 to-orange-500/10">
-              <BellIcon className="w-6 h-6 text-yellow-400" />
+            <div className="p-2 rounded-md bg-night-950 border border-night-700">
+              <BellIcon className="w-6 h-6 text-brand" />
             </div>
             Threat Alerts
           </h1>
@@ -308,9 +308,9 @@ export default function Alerts() {
               const Icon = config.icon
               
               return (
-                <div 
-                  key={alert.id} 
-                  className={`card border-l-4 overflow-hidden transition-all hover:shadow-lg hover:shadow-${alert.severity === 'critical' ? 'red' : alert.severity === 'high' ? 'orange' : 'dark'}-500/10 ${
+                <div
+                  key={alert.id}
+                  className={`card overflow-hidden transition-colors hover:border-night-600 ${
                     alert.is_dismissed ? 'opacity-50' : alert.is_read ? 'opacity-70' : ''
                   }`}
                   style={{ 
