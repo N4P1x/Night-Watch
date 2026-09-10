@@ -575,10 +575,22 @@ async def update_source(
     source = db.query(SourceModel).filter(SourceModel.id == source_id).first()
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
-    if "is_active" in source_update:
-        source.is_active = source_update["is_active"]
-    if "scrape_interval_minutes" in source_update:
-        source.scrape_interval_minutes = source_update["scrape_interval_minutes"]
+    # Whitelist of plain columns the UI may edit. Deliberately excludes
+    # credentials / auth secrets, which have their own rotation flow.
+    for key in (
+        "name",
+        "type",
+        "url",
+        "onion_url",
+        "description",
+        "language",
+        "is_active",
+        "uses_tor",
+        "is_onion",
+        "scrape_interval_minutes",
+    ):
+        if key in source_update and hasattr(source, key):
+            setattr(source, key, source_update[key])
     db.commit()
     db.refresh(source)
     return source

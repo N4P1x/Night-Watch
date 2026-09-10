@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { WebSocketProvider } from './contexts/WebSocketContext'
 import { ToastProvider } from './components/Toast'
+import ErrorBoundary from './components/ErrorBoundary'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Leaks from './pages/Leaks'
@@ -52,16 +53,18 @@ function AppRoutes() {
       
       <Route path="/" element={
         <ProtectedRoute>
-          <Layout />
+          <ErrorBoundary label="shell">
+            <Layout />
+          </ErrorBoundary>
         </ProtectedRoute>
       }>
-        <Route index element={<Dashboard />} />
-        <Route path="leaks" element={<Leaks />} />
-        <Route path="actors" element={<ThreatActors />} />
-        <Route path="iocs" element={<IOCs />} />
-        <Route path="sources" element={<Sources />} />
-        <Route path="alerts" element={<Alerts />} />
-        <Route path="settings" element={<Settings />} />
+        <Route index element={<ErrorBoundary label="dashboard"><Dashboard /></ErrorBoundary>} />
+        <Route path="leaks" element={<ErrorBoundary label="leaks"><Leaks /></ErrorBoundary>} />
+        <Route path="actors" element={<ErrorBoundary label="actors"><ThreatActors /></ErrorBoundary>} />
+        <Route path="iocs" element={<ErrorBoundary label="iocs"><IOCs /></ErrorBoundary>} />
+        <Route path="sources" element={<ErrorBoundary label="sources"><Sources /></ErrorBoundary>} />
+        <Route path="alerts" element={<ErrorBoundary label="alerts"><Alerts /></ErrorBoundary>} />
+        <Route path="settings" element={<ErrorBoundary label="settings"><Settings /></ErrorBoundary>} />
       </Route>
     </Routes>
   )

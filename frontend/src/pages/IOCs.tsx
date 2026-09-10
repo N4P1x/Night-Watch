@@ -74,7 +74,7 @@ export default function IOCs() {
   const exportCSV = () => {
     if (!data?.iocs?.length) return;
     const rows = data.iocs.map((i: any) =>
-      [i.type, `"${String(i.value).replace(/"/g, '""')}"`, i.source || '', `${((i.confidence || 0) * 100).toFixed(0)}%`].join(','),
+      [i.type, `"${String(i.value).replace(/"/g, '""')}"`, i.source_name ?? i.source ?? '', `${((i.confidence || 0) * 100).toFixed(0)}%`].join(','),
     );
     const blob = new Blob([['type,value,source,confidence', ...rows].join('\n')], { type: 'text/csv' });
     const a = document.createElement('a');
@@ -226,7 +226,7 @@ export default function IOCs() {
                         <span style={{ color: typeColor(ioc.type) }}>{typeLabel(ioc.type)}</span>
                       </span>
                     </td>
-                    <td className="text-ink-400 text-[12.5px] max-w-[160px] truncate">{ioc.source || '—'}</td>
+                    <td className="text-ink-400 text-[12.5px] max-w-[160px] truncate">{ioc.source_name ?? ioc.source ?? '—'}</td>
                     <td>
                       <span className="flex items-center gap-2">
                         <span className="w-16 h-1.5 rounded-full bg-night-950 border border-night-700 overflow-hidden">
@@ -299,12 +299,17 @@ export default function IOCs() {
                 </div>
               </div>
               <dl className="grid grid-cols-2 gap-3">
-                {[
-                  ['Source', selected.source || '—'],
-                  ['Confidence', `${((Number(selected.confidence) || 0) * 100).toFixed(0)}%`],
-                  ['First seen', selected.first_seen ? new Date(selected.first_seen).toLocaleString() : '—'],
-                  ['Last seen', selected.last_seen ? new Date(selected.last_seen).toLocaleString() : '—'],
-                ].map(([k, v]) => (
+                <div className="nw-inset p-3">
+                  <dt className="nw-eyebrow">Source</dt>
+                  <dd className="text-[13px] text-white mt-1 break-words">{selected.source_name ?? selected.source ?? '—'}</dd>
+                </div>
+                {(
+                  [
+                    ['Confidence', `${((Number(selected.confidence) || 0) * 100).toFixed(0)}%`],
+                    ['First seen', selected.first_seen ? new Date(selected.first_seen).toLocaleString() : '—'],
+                    ['Last seen', selected.last_seen ? new Date(selected.last_seen).toLocaleString() : '—'],
+                  ] as [string, string][]
+                ).map(([k, v]) => (
                   <div key={k} className="nw-inset p-3">
                     <dt className="nw-eyebrow">{k}</dt>
                     <dd className="text-[13px] text-white mt-1 break-words">{v}</dd>

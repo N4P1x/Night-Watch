@@ -23,7 +23,9 @@ class ThreatActorBase(BaseModel):
 
 
 class ThreatActorCreate(ThreatActorBase):
-    pass
+    # Model has risk_level column (default "low"); accept it so seeding/
+    # triage actually persists instead of silently dropping to "low".
+    risk_level: str = "low"
 
 
 class ThreatActorUpdate(BaseModel):

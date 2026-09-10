@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import { PageHeader, Stat, EmptyState, SkeletonRows, SeverityPill } from '../components/ui';
 import {
@@ -22,96 +23,84 @@ const SEED_ACTORS = [
     name: 'LockBit',
     aliases: ['LockBit 3.0', 'Team LockBit'],
     description: 'Prolific ransomware-as-a-service with double-extortion and aggressive affiliate program.',
-    threat_type: 'Ransomware',
     risk_level: 'critical',
-    origin: 'Russia/CIS',
     motivation: 'Financial',
     sophistication: 'High',
     resource_level: 'High',
-    target_sectors: ['Healthcare', 'Finance', 'Government', 'Critical Infrastructure'],
+    target_industries: ['Healthcare', 'Finance', 'Government', 'Critical Infrastructure'],
     target_regions: ['North America', 'Europe'],
     ttps: ['T1486', 'T1490', 'T1562', 'T1070'],
-    tools: ['LockBit Ransomware', 'StealBIT'],
+    associated_tools: ['LockBit Ransomware', 'StealBIT'],
     tags: ['ransomware', 'double-extortion', 'RaaS', 'active'],
   },
   {
     name: 'ALPHV/BlackCat',
     aliases: ['Noberus', 'ALPHV'],
     description: 'Rust-based RaaS known for healthcare and critical infrastructure targeting.',
-    threat_type: 'Ransomware',
     risk_level: 'critical',
-    origin: 'Russia/CIS',
     motivation: 'Financial',
     sophistication: 'Very High',
     resource_level: 'High',
-    target_sectors: ['Healthcare', 'Energy', 'Finance'],
+    target_industries: ['Healthcare', 'Energy', 'Finance'],
     target_regions: ['North America', 'Europe'],
     ttps: ['T1486', 'T1490', 'T1059', 'T1021'],
-    tools: ['BlackCat Ransomware', 'Exmatter'],
+    associated_tools: ['BlackCat Ransomware', 'Exmatter'],
     tags: ['ransomware', 'Rust', 'RaaS', 'active'],
   },
   {
     name: 'Clop',
     aliases: ['CLOP'],
     description: 'Ransomware group behind mass-exploitation campaigns (e.g. file-transfer zero-days).',
-    threat_type: 'Ransomware',
     risk_level: 'high',
-    origin: 'Russia/CIS',
     motivation: 'Financial',
     sophistication: 'High',
     resource_level: 'High',
-    target_sectors: ['Healthcare', 'Education', 'Finance'],
+    target_industries: ['Healthcare', 'Education', 'Finance'],
     target_regions: ['North America', 'Europe', 'Asia'],
     ttps: ['T1486', 'T1190', 'T1059'],
-    tools: ['Clop Ransomware'],
+    associated_tools: ['Clop Ransomware'],
     tags: ['ransomware', 'double-extortion', 'active'],
   },
   {
     name: 'Lazarus Group',
     aliases: ['Hidden Cobra', 'APT38'],
     description: 'North Korean state-sponsored group: financial crime, espionage, destructive attacks.',
-    threat_type: 'APT',
     risk_level: 'critical',
-    origin: 'Asia',
     motivation: 'Espionage',
     sophistication: 'Extremely High',
     resource_level: 'State-Level',
-    target_sectors: ['Finance', 'Government', 'Technology', 'Energy'],
+    target_industries: ['Finance', 'Government', 'Technology', 'Energy'],
     target_regions: ['North America', 'Europe', 'Asia'],
     ttps: ['T1059', 'T1070', 'T1005', 'T1021'],
-    tools: ['FALLCHILL', 'MANUSCript'],
+    associated_tools: ['FALLCHILL', 'MANUSCript'],
     tags: ['apt', 'state-sponsored', 'financial-crime'],
   },
   {
     name: 'APT29',
     aliases: ['Cozy Bear', 'Nobelium'],
     description: 'Russian SVR-associated APT known for supply-chain compromise and political espionage.',
-    threat_type: 'APT',
     risk_level: 'critical',
-    origin: 'Russia/CIS',
     motivation: 'Espionage',
     sophistication: 'Extremely High',
     resource_level: 'State-Level',
-    target_sectors: ['Government', 'Technology', 'Healthcare'],
+    target_industries: ['Government', 'Technology', 'Healthcare'],
     target_regions: ['North America', 'Europe'],
     ttps: ['T1059', 'T1070', 'T1560'],
-    tools: ['WellMess', 'NOBELIUM tooling'],
+    associated_tools: ['WellMess', 'NOBELIUM tooling'],
     tags: ['apt', 'state-sponsored', 'espionage'],
   },
   {
     name: 'Black Basta',
     aliases: ['Black Basta Ransomware'],
     description: 'RaaS with suspected Conti lineage, focused on critical infrastructure and healthcare.',
-    threat_type: 'Ransomware',
     risk_level: 'high',
-    origin: 'Russia/CIS',
     motivation: 'Financial',
     sophistication: 'High',
     resource_level: 'High',
-    target_sectors: ['Healthcare', 'Energy', 'Finance'],
+    target_industries: ['Healthcare', 'Energy', 'Finance'],
     target_regions: ['North America', 'Europe'],
     ttps: ['T1486', 'T1490', 'T1021'],
-    tools: ['Black Basta Ransomware', 'QakBot'],
+    associated_tools: ['Black Basta Ransomware', 'QakBot'],
     tags: ['ransomware', 'double-extortion', 'active'],
   },
 ];
@@ -120,19 +109,40 @@ const EMPTY_FORM: any = {
   name: '',
   aliases: [],
   description: '',
-  threat_type: 'Ransomware',
   risk_level: 'high',
-  origin: '',
   motivation: 'Financial',
   sophistication: 'High',
   resource_level: 'Medium',
-  target_sectors: [],
+  primary_languages: [],
+  target_industries: [],
   target_regions: [],
   ttps: [],
-  tools: [],
+  associated_tools: [],
+  associated_malware: [],
   tags: [],
   is_active: true,
 };
+
+function formFromActor(a: any) {
+  const asList = (v: unknown): string[] => (Array.isArray(v) ? v : v ? [String(v)] : []);
+  return {
+    name: a.name ?? '',
+    aliases: a.aliases ?? [],
+    description: a.description ?? '',
+    risk_level: a.risk_level ?? 'high',
+    motivation: a.motivation ?? 'Financial',
+    sophistication: a.sophistication ?? 'High',
+    resource_level: a.resource_level ?? 'Medium',
+    primary_languages: a.primary_languages ?? [],
+    target_industries: a.target_industries ?? [],
+    target_regions: a.target_regions ?? [],
+    ttps: a.ttps ?? [],
+    associated_tools: asList(a.associated_tools ?? (a as any).tools),
+    associated_malware: asList(a.associated_malware),
+    tags: a.tags ?? [],
+    is_active: a.is_active ?? true,
+  };
+}
 
 function csvCell(v: unknown) {
   return `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -146,6 +156,8 @@ export default function ThreatActors() {
   const [drawer, setDrawer] = useState<null | { mode: 'view'; actor: any } | { mode: 'add' } | { mode: 'edit'; actor: any }>(null);
   const [form, setForm] = useState<any>(EMPTY_FORM);
   const { showToast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const queryClient = useQueryClient();
   const LIMIT = 20;
 
@@ -227,9 +239,9 @@ export default function ThreatActors() {
 
   const exportCSV = () => {
     if (!actors.length) return;
-    const head = 'name,risk,status,type,origin,sectors';
+    const head = 'name,risk,status,industries,regions';
     const rows = actors.map((a: any) =>
-      [a.name, a.risk_level, a.is_active ? 'active' : 'idle', a.threat_type || '', a.origin || '', (a.target_sectors ?? []).join('; ')]
+      [a.name, a.risk_level, a.is_active ? 'active' : 'idle', (a.target_industries ?? []).join('; '), (a.target_regions ?? []).join('; ')]
         .map(csvCell)
         .join(','),
     );
@@ -255,7 +267,11 @@ export default function ThreatActors() {
             <button onClick={exportCSV} className="btn btn-secondary">
               <ArrowDownTrayIcon className="w-4 h-4" /> Export
             </button>
-            <button onClick={seed} className="btn btn-secondary">Seed known</button>
+            {isAdmin && (
+              <button onClick={seed} className="btn btn-secondary" title="Admin only">
+                Seed known
+              </button>
+            )}
             <button
               onClick={() => {
                 setForm(EMPTY_FORM);
@@ -329,11 +345,11 @@ export default function ThreatActors() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Actor</th>
-                  <th>Risk</th>
-                  <th>Type</th>
-                  <th>Origin</th>
-                  <th>Status</th>
+                    <th>Actor</th>
+                    <th>Risk</th>
+                    <th>Industries</th>
+                    <th>Regions</th>
+                    <th>Status</th>
                   <th className="text-right">Actions</th>
                 </tr>
               </thead>
@@ -347,8 +363,10 @@ export default function ThreatActors() {
                     <td>
                       <SeverityPill value={a.risk_level} />
                     </td>
-                    <td className="text-ink-400 text-[12.5px]">{a.threat_type || '—'}</td>
-                    <td className="text-ink-400 text-[12.5px]">{a.origin || '—'}</td>
+                    <td className="text-ink-400 text-[12.5px] max-w-[180px] truncate">
+                      {(a.target_industries ?? []).slice(0, 2).join(', ') || '—'}
+                    </td>
+                    <td className="text-ink-400 text-[12.5px] max-w-[140px] truncate">{(a.target_regions ?? []).slice(0, 2).join(', ') || '—'}</td>
                     <td>
                       <span className={`badge ${a.is_active ? 'badge-low' : 'badge-neutral'}`}>{a.is_active ? 'Active' : 'Idle'}</span>
                     </td>
@@ -358,23 +376,7 @@ export default function ThreatActors() {
                       </button>
                       <button
                         onClick={() => {
-                          setForm({
-                            name: a.name ?? '',
-                            aliases: a.aliases ?? [],
-                            description: a.description ?? '',
-                            threat_type: a.threat_type ?? 'Ransomware',
-                            risk_level: a.risk_level ?? 'high',
-                            origin: a.origin ?? '',
-                            motivation: a.motivation ?? 'Financial',
-                            sophistication: a.sophistication ?? 'High',
-                            resource_level: a.resource_level ?? 'Medium',
-                            target_sectors: a.target_sectors ?? [],
-                            target_regions: a.target_regions ?? [],
-                            ttps: a.ttps ?? [],
-                            tools: Array.isArray(a.tools) ? a.tools : a.tools ? [a.tools] : [],
-                            tags: a.tags ?? [],
-                            is_active: a.is_active ?? true,
-                          });
+                          setForm(formFromActor(a));
                           setDrawer({ mode: 'edit', actor: a });
                         }}
                         className="btn btn-ghost !px-2 !py-1.5"
@@ -382,9 +384,11 @@ export default function ThreatActors() {
                       >
                         <PencilIcon className="w-4 h-4" />
                       </button>
-                      <button onClick={() => remove(a)} className="btn btn-ghost !px-2 !py-1.5 hover:!text-sev-critical" title="Delete">
-                        <TrashIcon className="w-4 h-4" />
-                      </button>
+                      {isAdmin && (
+                        <button onClick={() => remove(a)} className="btn btn-ghost !px-2 !py-1.5 hover:!text-sev-critical" title="Delete (admin)">
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -424,25 +428,10 @@ export default function ThreatActors() {
             {drawer.mode === 'view' ? (
               <ActorProfile
                 actor={(drawer as any).actor}
+                isAdmin={isAdmin}
                 onEdit={() => {
                   const a = (drawer as any).actor;
-                  setForm({
-                    name: a.name ?? '',
-                    aliases: a.aliases ?? [],
-                    description: a.description ?? '',
-                    threat_type: a.threat_type ?? 'Ransomware',
-                    risk_level: a.risk_level ?? 'high',
-                    origin: a.origin ?? '',
-                    motivation: a.motivation ?? 'Financial',
-                    sophistication: a.sophistication ?? 'High',
-                    resource_level: a.resource_level ?? 'Medium',
-                    target_sectors: a.target_sectors ?? [],
-                    target_regions: a.target_regions ?? [],
-                    ttps: a.ttps ?? [],
-                    tools: Array.isArray(a.tools) ? a.tools : a.tools ? [a.tools] : [],
-                    tags: a.tags ?? [],
-                    is_active: a.is_active ?? true,
-                  });
+                  setForm(formFromActor(a));
                   setDrawer({ mode: 'edit', actor: a });
                 }}
                 onToggle={() => {
@@ -461,7 +450,7 @@ export default function ThreatActors() {
   );
 }
 
-function ActorProfile({ actor: a, onEdit, onToggle, onDelete }: any) {
+function ActorProfile({ actor: a, isAdmin, onEdit, onToggle, onDelete }: any) {
   const list = (title: string, items?: string[], mono = false) => (
     <div>
       <p className="nw-label">{title}</p>
@@ -484,7 +473,7 @@ function ActorProfile({ actor: a, onEdit, onToggle, onDelete }: any) {
         <div className="flex items-center gap-2">
           <SeverityPill value={a.risk_level} />
           <span className={`badge ${a.is_active ? 'badge-low' : 'badge-neutral'}`}>{a.is_active ? 'Active' : 'Idle'}</span>
-          <span className="badge badge-neutral">{a.threat_type || 'Unknown'}</span>
+          <span className="badge badge-neutral">{a.motivation || 'Unknown motive'}</span>
         </div>
         {!!a.aliases?.length && (
           <p className="text-[12.5px] text-ink-500">
@@ -494,7 +483,7 @@ function ActorProfile({ actor: a, onEdit, onToggle, onDelete }: any) {
         {a.description && <p className="text-[13px] leading-6 text-ink-400">{a.description}</p>}
         <dl className="grid grid-cols-2 gap-3">
           {[
-            ['Origin', a.origin || '—'],
+            ['Languages', (a.primary_languages ?? []).join(', ') || '—'],
             ['Motivation', a.motivation || '—'],
             ['Sophistication', a.sophistication || '—'],
             ['Resources', a.resource_level || '—'],
@@ -505,10 +494,11 @@ function ActorProfile({ actor: a, onEdit, onToggle, onDelete }: any) {
             </div>
           ))}
         </dl>
-        {list('Target sectors', a.target_sectors)}
+        {list('Target sectors', a.target_industries)}
         {list('Target regions', a.target_regions)}
         {list('TTPs (MITRE)', a.ttps, true)}
-        {list('Tooling', Array.isArray(a.tools) ? a.tools : a.tools ? [a.tools] : [])}
+        {list('Tooling', a.associated_tools ?? [])}
+        {list('Malware', a.associated_malware ?? [])}
         {list('Tags', a.tags)}
       </div>
       <footer className="border-t border-night-700 p-4 flex gap-2">
@@ -518,9 +508,11 @@ function ActorProfile({ actor: a, onEdit, onToggle, onDelete }: any) {
         <button onClick={onEdit} className="btn btn-secondary flex-1">
           <PencilIcon className="w-4 h-4" /> Edit
         </button>
-        <button onClick={onDelete} className="btn btn-danger">
-          <TrashIcon className="w-4 h-4" />
-        </button>
+        {isAdmin && (
+          <button onClick={onDelete} className="btn btn-danger" title="Delete (admin)">
+            <TrashIcon className="w-4 h-4" />
+          </button>
+        )}
       </footer>
     </>
   );
@@ -541,7 +533,14 @@ function ActorForm({ form, setForm, onCancel, onSave, mode }: any) {
       <div className="flex-1 overflow-y-auto scrollbar p-5 space-y-4">
         <div>
           <label className="nw-label">Name *</label>
-          <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} />
+          <input
+            className="input font-mono disabled:opacity-60"
+            value={form.name}
+            onChange={(e) => set('name', e.target.value)}
+            disabled={mode === 'edit'}
+            title={mode === 'edit' ? 'Names are immutable (backend key)' : undefined}
+          />
+          {mode === 'edit' && <p className="nw-hint">Name is the identity key and cannot be renamed.</p>}
         </div>
         <div>
           <label className="nw-label">Aliases (comma-separated)</label>
@@ -558,12 +557,8 @@ function ActorForm({ form, setForm, onCancel, onSave, mode }: any) {
             </select>
           </div>
           <div>
-            <label className="nw-label">Type</label>
-            <select className="input" value={form.threat_type} onChange={(e) => set('threat_type', e.target.value)}>
-              {['Ransomware', 'APT', 'Cybercrime', 'Hacktivist', 'State-Sponsored', 'Espionage'].map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
+            <label className="nw-label">Industries (comma-separated)</label>
+            <input className="input" value={(form.target_industries ?? []).join(', ')} onChange={(e) => arr('target_industries', e.target.value)} />
           </div>
         </div>
         <div>
@@ -572,8 +567,8 @@ function ActorForm({ form, setForm, onCancel, onSave, mode }: any) {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="nw-label">Origin</label>
-            <input className="input" value={form.origin} onChange={(e) => set('origin', e.target.value)} />
+            <label className="nw-label">Languages (comma-separated)</label>
+            <input className="input" value={(form.primary_languages ?? []).join(', ')} onChange={(e) => arr('primary_languages', e.target.value)} />
           </div>
           <div>
             <label className="nw-label">Motivation</label>
@@ -586,7 +581,11 @@ function ActorForm({ form, setForm, onCancel, onSave, mode }: any) {
         </div>
         <div>
           <label className="nw-label">Tools (comma-separated)</label>
-          <input className="input" value={(form.tools ?? []).join(', ')} onChange={(e) => arr('tools', e.target.value)} />
+          <input className="input" value={(form.associated_tools ?? []).join(', ')} onChange={(e) => arr('associated_tools', e.target.value)} />
+        </div>
+        <div>
+          <label className="nw-label">Malware (comma-separated)</label>
+          <input className="input" value={(form.associated_malware ?? []).join(', ')} onChange={(e) => arr('associated_malware', e.target.value)} />
         </div>
         <label className="flex items-center gap-2 text-[13px] cursor-pointer">
           <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} className="w-4 h-4 accent-[#F0A832]" />

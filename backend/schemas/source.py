@@ -15,6 +15,7 @@ class SourceBase(BaseModel):
     auth_type: str | None = None
     is_onion: bool = False
     uses_tor: bool = False
+    is_active: bool = True
     scrape_interval_minutes: int = 60
     tags: list[str] = []
 
@@ -31,8 +32,11 @@ class SourceUpdate(BaseModel):
     url: str | None = None
     onion_url: str | None = None
     description: str | None = None
+    language: str | None = None
     requires_auth: bool | None = None
     is_active: bool | None = None
+    uses_tor: bool | None = None
+    is_onion: bool | None = None
     scrape_interval_minutes: int | None = None
     tags: list[str] | None = None
 

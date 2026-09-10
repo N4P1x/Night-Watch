@@ -40,8 +40,9 @@ export interface IOC {
   value: string
   context?: string
   confidence?: number
-  source?: string
   source_name?: string
+  /** Legacy alias — backend field is source_name. */
+  source?: string
   tags?: string[]
   first_seen?: string
   last_seen?: string
@@ -59,6 +60,8 @@ export interface Alert {
   title: string
   severity: string
   description?: string
+  /** Legacy alias — backend field is description. */
+  message?: string
   source_name?: string
   entity_type?: string
   entity_id?: number
@@ -91,6 +94,9 @@ export interface Source {
   description?: string
   language?: string
   scrape_interval_minutes?: number
+  reliability_score?: number
+  last_scraped?: string
+  last_success?: string
 }
 
 export interface SourceListResponse {
@@ -107,6 +113,7 @@ export interface ThreatActor {
   motivation?: string
   sophistication?: string
   resource_level?: string
+  primary_languages?: string[]
   target_industries?: string[]
   target_regions?: string[]
   is_active?: boolean
@@ -114,7 +121,10 @@ export interface ThreatActor {
   last_activity?: string
   ttps?: string[]
   associated_tools?: string[]
+  associated_malware?: string[]
+  associated_ransomware?: string[]
   wallet_addresses?: string[]
+  tags?: string[]
   notes?: string
   attribution_score?: number
   threat_score?: number

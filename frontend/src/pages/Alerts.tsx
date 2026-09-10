@@ -145,7 +145,7 @@ export default function Alerts() {
                       <SeverityPill value={a.severity} />
                       <span className={`text-[13.5px] ${a.is_read ? 'text-ink-400' : 'text-white font-semibold'}`}>{a.title}</span>
                     </div>
-                    {a.message && <p className="text-[12.5px] text-ink-500 mt-1 line-clamp-2">{a.message}</p>}
+                    {(a.description ?? a.message) && <p className="text-[12.5px] text-ink-500 mt-1 line-clamp-2">{a.description ?? a.message}</p>}
                     <p className="font-mono text-[11px] text-ink-500 mt-1.5 tabular-nums">
                       {a.created_at ? new Date(a.created_at).toLocaleString() : '—'}
                       {a.is_dismissed ? ' · dismissed' : ''}
