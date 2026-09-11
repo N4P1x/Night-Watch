@@ -9,22 +9,22 @@ pydantic==2.5.3; python_version < "3.14"
 pydantic==2.13.3; python_version >= "3.14"
 pydantic-settings==2.1.0; python_version < "3.14"
 pydantic-settings==2.14.2; python_version >= "3.14"
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.4.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 python-multipart==0.0.31
 motor==3.3.2
-pymongo==4.6.1
+pymongo==4.6.3
 redis==5.0.1
 celery==5.3.6
 httpx==0.25.2
 beautifulsoup4==4.12.3
 lxml==5.1.0; python_version < "3.14"
 lxml==6.1.0; python_version >= "3.14"
-requests[socks]==2.31.0
+requests[socks]==2.33.0
 pysocks==1.7.1
 aiohttp==3.14.3
-python-dotenv==1.0.0
+python-dotenv==1.2.2
 email-validator==2.1.0
 websockets==17.1
 psycopg2-binary==2.9.9; python_version < "3.14"
