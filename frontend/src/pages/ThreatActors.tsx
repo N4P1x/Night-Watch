@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
-import { useQueryState, useQueryPage } from '../utils/querystate';
+import { useQueryParams, pageFromParams, pagePatch } from '../utils/querystate';
 import { useToast } from '../components/Toast';
-import { PageHeader, Stat, EmptyState, SkeletonRows, SeverityPill, ConfirmButton, SearchInput, rowKeyboardProps } from '../components/ui';
+import { PageHeader, Stat, EmptyState, SkeletonRows, SeverityPill, ConfirmButton, SearchInput, rowKeyboardProps, useDrawerFocus } from '../components/ui';
 import {
   MagnifyingGlassIcon,
   XMarkIcon,
@@ -150,11 +150,14 @@ function csvCell(v: unknown) {
 }
 
 export default function ThreatActors() {
-  const [search, setSearch] = useQueryState('q');
-  const [risk, setRisk] = useQueryState('risk');
-  const [active, setActive] = useQueryState('status');
-  const activeValue = active === 'active' || active === 'idle' ? active : 'all';
-  const [page, setPage] = useQueryPage();
+  const [params, updateParams] = useQueryParams();
+  const search = params.get('q') ?? '';
+  const risk = params.get('risk') ?? '';
+  const activeParam = params.get('status');
+  const activeValue = activeParam === 'active' || activeParam === 'idle' ? activeParam : 'all';
+  const page = pageFromParams(params);
+  const setFilter = (patch: Record<string, string | null | undefined>) =>
+    updateParams({ ...patch, ...pagePatch(0) });
   const [drawer, setDrawer] = useState<null | { mode: 'view'; actor: any } | { mode: 'add' } | { mode: 'edit'; actor: any }>(null);
   const [form, setForm] = useState<any>(EMPTY_FORM);
   const { showToast } = useToast();
@@ -181,6 +184,7 @@ export default function ThreatActors() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [drawer]);
+  useDrawerFocus(!!drawer, 'actor-drawer');
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['threat-actors'] });
 
@@ -306,21 +310,18 @@ export default function ThreatActors() {
             id="actors-search"
             label="Search actors by name or alias"
             value={search}
-            onChange={(v) => {
-              setSearch(v);
-              setPage(0);
-            }}
+            onChange={(v) => setFilter({ q: v })}
             placeholder="Search name or alias…"
             icon={<MagnifyingGlassIcon className="w-4 h-4 text-ink-500 flex-shrink-0" aria-hidden="true" />}
           />
           <div className="flex gap-1.5">
             {(['all', 'active', 'idle'] as const).map((v) => (
-              <button key={v} onClick={() => { setActive(v === 'all' ? '' : v); setPage(0); }} className={`nw-tab capitalize ${activeValue === v ? 'nw-tab-active' : ''}`}>
+              <button key={v} onClick={() => setFilter({ status: v === 'all' ? null : v })} className={`nw-tab capitalize ${activeValue === v ? 'nw-tab-active' : ''}`}>
                 {v}
               </button>
             ))}
           </div>
-          <select value={risk} onChange={(e) => setRisk(e.target.value)} className="input !w-auto" aria-label="Risk">
+          <select value={risk} onChange={(e) => setFilter({ risk: e.target.value || null })} className="input !w-auto" aria-label="Risk">
             <option value="">All risk</option>
             <option value="critical">Critical</option>
             <option value="high">High</option>
@@ -410,13 +411,13 @@ export default function ThreatActors() {
           )}
           {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-night-700">
-            <button disabled={page === 0} onClick={() => setPage(Math.max(0, page - 1))} className="btn btn-secondary !py-1.5">
+            <button disabled={page === 0} onClick={() => updateParams(pagePatch(Math.max(0, page - 1)))} className="btn btn-secondary !py-1.5">
               <ChevronLeftIcon className="w-4 h-4" aria-hidden="true" /> Prev
             </button>
             <span className="font-mono text-[12px] text-ink-500 tabular-nums">
               {page + 1} / {totalPages}
             </span>
-            <button disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)} className="btn btn-secondary !py-1.5">
+            <button disabled={page >= totalPages - 1} onClick={() => updateParams(pagePatch(page + 1))} className="btn btn-secondary !py-1.5">
               Next <ChevronRightIcon className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
@@ -427,7 +428,7 @@ export default function ThreatActors() {
       {drawer && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Actor detail">
           <div className="absolute inset-0 bg-black/70" onClick={() => setDrawer(null)} />
-          <aside className="absolute right-0 top-0 bottom-0 w-full max-w-[480px] bg-night-900 border-l border-night-700 flex flex-col animate-fade-in overscroll-contain">
+          <aside id="actor-drawer" tabIndex={-1} className="absolute right-0 top-0 bottom-0 w-full max-w-[480px] bg-night-900 border-l border-night-700 flex flex-col animate-fade-in overscroll-contain">
             <header className="px-5 py-4 border-b border-night-700 flex items-center justify-between">
               <div>
                 <p className="nw-eyebrow">{drawer.mode === 'add' ? 'New actor' : drawer.mode === 'edit' ? 'Edit actor' : 'Actor profile'}</p>

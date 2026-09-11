@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
-import { PageHeader, Section, EmptyState, SkeletonRows, SearchInput, rowKeyboardProps } from '../components/ui';
-import { useQueryState, useQueryPage } from '../utils/querystate';
+import { PageHeader, Section, EmptyState, SkeletonRows, SearchInput, rowKeyboardProps, useDrawerFocus } from '../components/ui';
+import { useQueryParams, pageFromParams, pagePatch } from '../utils/querystate';
 import {
   MagnifyingGlassIcon,
   ClipboardDocumentIcon,
@@ -34,10 +34,13 @@ function typeLabel(id: string) {
 }
 
 export default function IOCs() {
-  const [search, setSearch] = useQueryState('q');
-  const [iocType, setIocType] = useQueryState('type');
-  const [source, setSource] = useQueryState('source');
-  const [page, setPage] = useQueryPage();
+  const [params, updateParams] = useQueryParams();
+  const search = params.get('q') ?? '';
+  const iocType = params.get('type') ?? '';
+  const source = params.get('source') ?? '';
+  const page = pageFromParams(params);
+  const setFilter = (patch: Record<string, string | null | undefined>) =>
+    updateParams({ ...patch, ...pagePatch(0) });
   const [selected, setSelected] = useState<any>(null);
   const [isScraping, setIsScraping] = useState(false);
   const { showToast } = useToast();
@@ -52,6 +55,7 @@ export default function IOCs() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [selected]);
+  useDrawerFocus(!!selected, 'ioc-drawer');
 
   const { data: sourcesData } = useQuery({
     queryKey: ['ioc-sources'],
@@ -138,10 +142,7 @@ export default function IOCs() {
               return (
                 <button
                   key={t.id}
-                  onClick={() => {
-                    setIocType(active ? '' : t.id);
-                    setPage(0);
-                  }}
+                  onClick={() => setFilter({ type: active ? null : t.id })}
                   className={`flex items-center gap-2.5 text-left px-2 py-1.5 rounded-md transition-colors ${active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'}`}
                 >
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: t.color }} />
@@ -163,21 +164,18 @@ export default function IOCs() {
             id="iocs-search"
             label="Search IOCs by value, hash, or CVE"
             value={search}
-            onChange={(v) => {
-              setSearch(v);
-              setPage(0);
-            }}
+            onChange={(v) => setFilter({ q: v })}
             placeholder="Search value, hash, CVE…"
             icon={<MagnifyingGlassIcon className="w-4 h-4 text-ink-500 flex-shrink-0" aria-hidden="true" />}
           />
           <div className="flex gap-2">
-            <select value={iocType} onChange={(e) => { setIocType(e.target.value); setPage(0); }} className="input !w-auto" aria-label="Type">
+            <select value={iocType} onChange={(e) => setFilter({ type: e.target.value || null })} className="input !w-auto" aria-label="Type">
               <option value="">All types</option>
               {IOC_TYPES.map((t) => (
                 <option key={t.id} value={t.id}>{t.label}</option>
               ))}
             </select>
-            <select value={source} onChange={(e) => { setSource(e.target.value); setPage(0); }} className="input !w-auto max-w-[180px]" aria-label="Source">
+            <select value={source} onChange={(e) => setFilter({ source: e.target.value || null })} className="input !w-auto max-w-[180px]" aria-label="Source">
               <option value="">All sources</option>
               {(sourcesData?.names ?? []).map((n: string) => (
                 <option key={n} value={n}>{n}</option>
@@ -185,12 +183,7 @@ export default function IOCs() {
             </select>
             {(search || iocType || source) && (
               <button
-                onClick={() => {
-                  setSearch('');
-                  setIocType('');
-                  setSource('');
-                  setPage(0);
-                }}
+                onClick={() => setFilter({ q: null, type: null, source: null })}
                 className="btn btn-ghost text-[12.5px]"
               >
                 Clear
@@ -267,13 +260,13 @@ export default function IOCs() {
           )}
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-night-700">
-              <button disabled={page === 0} onClick={() => setPage(Math.max(0, page - 1))} className="btn btn-secondary !py-1.5">
+              <button disabled={page === 0} onClick={() => updateParams(pagePatch(Math.max(0, page - 1)))} className="btn btn-secondary !py-1.5">
                 <ChevronLeftIcon className="w-4 h-4" aria-hidden="true" /> Prev
               </button>
               <span className="font-mono text-[12px] text-ink-500 tabular-nums">
                 {page + 1} / {totalPages} · {(data?.total ?? 0).toLocaleString()} total
               </span>
-              <button disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)} className="btn btn-secondary !py-1.5">
+              <button disabled={page >= totalPages - 1} onClick={() => updateParams(pagePatch(page + 1))} className="btn btn-secondary !py-1.5">
                 Next <ChevronRightIcon className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
@@ -284,7 +277,7 @@ export default function IOCs() {
       {selected && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="IOC detail">
           <div className="absolute inset-0 bg-black/70" onClick={() => setSelected(null)} />
-          <aside className="absolute right-0 top-0 bottom-0 w-full max-w-[440px] bg-night-900 border-l border-night-700 flex flex-col animate-fade-in overscroll-contain">
+          <aside id="ioc-drawer" tabIndex={-1} className="absolute right-0 top-0 bottom-0 w-full max-w-[440px] bg-night-900 border-l border-night-700 flex flex-col animate-fade-in overscroll-contain">
             <header className="px-5 py-4 border-b border-night-700 flex items-center justify-between">
               <div>
                 <p className="nw-eyebrow">IOC detail</p>

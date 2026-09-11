@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { SEVERITY_BADGE, normalizeSeverity } from '../utils/severity';
 
@@ -172,6 +172,20 @@ export function ConfirmButton(props: {
       {armed ? (props.armedLabel ?? 'Confirm?') : (props.children ?? props.label)}
     </button>
   );
+}
+
+/** Focus discipline for drawers: move focus in on open, restore to the
+ *  invoking control on close. Escape handling stays with the caller. */
+export function useDrawerFocus(open: boolean, panelId: string) {
+  const opener = useRef<Element | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    opener.current = document.activeElement;
+    document.getElementById(panelId)?.focus();
+    return () => {
+      (opener.current as HTMLElement | null)?.focus?.();
+    };
+  }, [open, panelId]);
 }
 
 /** Keyboard path for clickable table rows (mouse keeps onClick). */

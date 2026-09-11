@@ -2,8 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
-import { PageHeader, EmptyState, SkeletonRows, SeverityPill, SearchInput, rowKeyboardProps } from '../components/ui';
-import { useQueryState, useQueryPage } from '../utils/querystate';
+import { PageHeader, EmptyState, SkeletonRows, SeverityPill, SearchInput, rowKeyboardProps, useDrawerFocus } from '../components/ui';
+import { useQueryParams, pageFromParams, pagePatch } from '../utils/querystate';
 import { SEVERITY_ORDER, normalizeSeverity } from '../utils/severity';
 import {
   MagnifyingGlassIcon,
@@ -25,13 +25,16 @@ function stripHtml(html: string): string {
 
 export default function Leaks() {
   // Filters + page live in the URL — views stay shareable and survive reload.
-  const [search, setSearch] = useQueryState('q');
-  const [severity, setSeverity] = useQueryState('severity');
-  const [route, setRoute] = useQueryState('route');
-  const [sort, setSort] = useQueryState('sort');
-  const [page, setPage] = useQueryPage();
-  const routeValue = route === 'onion' || route === 'clear' ? route : 'all';
-  const sortValue = sort === 'severity' ? 'severity' : 'date';
+  // One atomic update per gesture (see querystate docs).
+  const [params, updateParams] = useQueryParams();
+  const search = params.get('q') ?? '';
+  const severity = params.get('severity') ?? '';
+  const routeParam = params.get('route');
+  const routeValue = routeParam === 'onion' || routeParam === 'clear' ? routeParam : 'all';
+  const sortValue = params.get('sort') === 'severity' ? 'severity' : 'date';
+  const page = pageFromParams(params);
+  const setFilter = (patch: Record<string, string | null | undefined>) =>
+    updateParams({ ...patch, ...pagePatch(0) });
   const [selected, setSelected] = useState<any>(null);
   const [isScraping, setIsScraping] = useState(false);
   const queryClient = useQueryClient();
@@ -46,9 +49,10 @@ export default function Leaks() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [selected]);
+  useDrawerFocus(!!selected, 'leak-drawer');
 
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['leaks', search, severity, route, page],
+    queryKey: ['leaks', search, severity, routeValue, page],
     queryFn: async () => {
       const params: any = { search: search || undefined, skip: page * LIMIT, limit: LIMIT };
       if (severity) params.severity = severity;
@@ -132,19 +136,16 @@ export default function Leaks() {
             id="leaks-search"
             label="Search leaks by victim, title, or actor"
             value={search}
-            onChange={(v) => {
-              setSearch(v);
-              setPage(0);
-            }}
+            onChange={(v) => setFilter({ q: v })}
             placeholder="Search victims, titles, actors…"
             icon={<MagnifyingGlassIcon className="w-4 h-4 text-ink-500 flex-shrink-0" aria-hidden="true" />}
           />
           <div className="flex gap-1.5 flex-wrap">
-            <button onClick={() => { setSeverity(''); setPage(0); }} className={`nw-tab ${!severity ? 'nw-tab-active' : ''}`}>
+            <button onClick={() => setFilter({ severity: null })} className={`nw-tab ${!severity ? 'nw-tab-active' : ''}`}>
               All severities
             </button>
             {SEVERITY_ORDER.map((s) => (
-              <button key={s} onClick={() => { setSeverity(severity === s ? '' : s); setPage(0); }} className={`nw-tab capitalize ${severity === s ? 'nw-tab-active' : ''}`}>
+              <button key={s} onClick={() => setFilter({ severity: severity === s ? null : s })} className={`nw-tab capitalize ${severity === s ? 'nw-tab-active' : ''}`}>
                 {s}
               </button>
             ))}
@@ -152,11 +153,11 @@ export default function Leaks() {
           <span className="hidden xl:block w-px h-6 bg-night-700" />
           <div className="flex gap-1.5">
             {(['all', 'onion', 'clear'] as const).map((v) => (
-              <button key={v} onClick={() => { setRoute(v === 'all' ? '' : v); setPage(0); }} className={`nw-tab ${routeValue === v ? 'nw-tab-active' : ''}`}>
+              <button key={v} onClick={() => setFilter({ route: v === 'all' ? null : v })} className={`nw-tab ${routeValue === v ? 'nw-tab-active' : ''}`}>
                 {v === 'all' ? 'All routes' : v === 'onion' ? 'Tor' : 'Clearnet'}
               </button>
             ))}
-            <button onClick={() => setSort(sortValue === 'date' ? 'severity' : 'date')} className="nw-tab" title="Toggle sort">
+            <button onClick={() => setFilter({ sort: sortValue === 'date' ? 'severity' : null })} className="nw-tab" title="Toggle sort">
               <span className="inline-flex items-center gap-1.5">
                 <ArrowsUpDownIcon className="w-3.5 h-3.5" aria-hidden="true" /> {sortValue === 'date' ? 'Newest' : 'Severity'}
               </span>
@@ -210,13 +211,13 @@ export default function Leaks() {
           )}
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-night-700">
-              <button disabled={page === 0} onClick={() => setPage(Math.max(0, page - 1))} className="btn btn-secondary !py-1.5">
+              <button disabled={page === 0} onClick={() => updateParams(pagePatch(Math.max(0, page - 1)))} className="btn btn-secondary !py-1.5">
                 <ChevronLeftIcon className="w-4 h-4" aria-hidden="true" /> Prev
               </button>
               <span className="font-mono text-[12px] text-ink-500 tabular-nums">
                 {page + 1} / {totalPages} · {(data?.total ?? 0).toLocaleString()} total
               </span>
-              <button disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)} className="btn btn-secondary !py-1.5">
+              <button disabled={page >= totalPages - 1} onClick={() => updateParams(pagePatch(page + 1))} className="btn btn-secondary !py-1.5">
                 Next <ChevronRightIcon className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
@@ -227,7 +228,7 @@ export default function Leaks() {
       {selected && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Leak report">
           <div className="absolute inset-0 bg-black/70" onClick={() => setSelected(null)} />
-          <aside className="absolute right-0 top-0 bottom-0 w-full max-w-[560px] bg-night-900 border-l border-night-700 flex flex-col animate-fade-in overscroll-contain">
+          <aside id="leak-drawer" tabIndex={-1} className="absolute right-0 top-0 bottom-0 w-full max-w-[560px] bg-night-900 border-l border-night-700 flex flex-col animate-fade-in overscroll-contain">
             <header className="px-5 py-4 border-b border-night-700">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">

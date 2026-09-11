@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
-import { PageHeader, EmptyState, SkeletonRows, rowKeyboardProps } from '../components/ui';
-import { useQueryState, useQueryPage } from '../utils/querystate';
+import { PageHeader, EmptyState, SkeletonRows, useDrawerFocus } from '../components/ui';
+import { useQueryParams, pageFromParams, pagePatch } from '../utils/querystate';
 import {
   PlusIcon,
   XMarkIcon,
@@ -46,10 +46,13 @@ const EMPTY_FORM = {
 };
 
 export default function Sources() {
-  const [page, setPage] = useQueryPage();
-  const [sourceType, setSourceType] = useQueryState('type');
-  const [activeFilter, setActiveFilter] = useQueryState('status');
-  const activeValue = activeFilter === 'active' || activeFilter === 'inactive' ? activeFilter : 'all';
+  const [params, updateParams] = useQueryParams();
+  const sourceType = params.get('type') ?? '';
+  const activeParam = params.get('status');
+  const activeValue = activeParam === 'active' || activeParam === 'inactive' ? activeParam : 'all';
+  const page = pageFromParams(params);
+  const setFilter = (patch: Record<string, string | null | undefined>) =>
+    updateParams({ ...patch, ...pagePatch(0) });
   const [drawer, setDrawer] = useState<null | { mode: 'add' } | { mode: 'edit'; source: any }>(null);
   const [form, setForm] = useState<any>(EMPTY_FORM);
   const { showToast } = useToast();
@@ -64,9 +67,10 @@ export default function Sources() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [drawer]);
+  useDrawerFocus(!!drawer, 'source-drawer');
 
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['sources', page, sourceType, activeFilter],
+    queryKey: ['sources', page, sourceType, activeValue],
     queryFn: async () => {
       const params: any = { skip: page * LIMIT, limit: LIMIT };
       if (sourceType) params.source_type = sourceType;
@@ -188,10 +192,7 @@ export default function Sources() {
             {(['all', 'active', 'inactive'] as const).map((v) => (
               <button
                 key={v}
-                onClick={() => {
-                  setActiveFilter(v === 'all' ? '' : v);
-                  setPage(0);
-                }}
+                onClick={() => setFilter({ status: v === 'all' ? null : v })}
                 className={`nw-tab capitalize ${activeValue === v ? 'nw-tab-active' : ''}`}
               >
                 {v}
@@ -199,7 +200,7 @@ export default function Sources() {
             ))}
           </div>
           <span className="hidden md:block w-px h-6 bg-night-700" />
-          <select value={sourceType} onChange={(e) => { setSourceType(e.target.value); setPage(0); }} className="input !w-auto" aria-label="Type">
+          <select value={sourceType} onChange={(e) => setFilter({ type: e.target.value || null })} className="input !w-auto" aria-label="Type">
             <option value="">All types</option>
             {SOURCE_TYPES.map((t) => (
               <option key={t.id} value={t.id}>{t.label}</option>
@@ -207,11 +208,7 @@ export default function Sources() {
           </select>
           {(sourceType || activeValue !== 'all') && (
             <button
-              onClick={() => {
-                setSourceType('');
-                setActiveFilter('');
-                setPage(0);
-              }}
+              onClick={() => setFilter({ type: null, status: null })}
               className="btn btn-ghost text-[12.5px]"
             >
               Clear
@@ -287,13 +284,13 @@ export default function Sources() {
           )}
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-night-700">
-              <button disabled={page === 0} onClick={() => setPage(Math.max(0, page - 1))} className="btn btn-secondary !py-1.5">
+              <button disabled={page === 0} onClick={() => updateParams(pagePatch(Math.max(0, page - 1)))} className="btn btn-secondary !py-1.5">
                 <ChevronLeftIcon className="w-4 h-4" aria-hidden="true" /> Prev
               </button>
               <span className="font-mono text-[12px] text-ink-500 tabular-nums">
                 {page + 1} / {totalPages} · {(data?.total ?? 0).toLocaleString()} total
               </span>
-              <button disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)} className="btn btn-secondary !py-1.5">
+              <button disabled={page >= totalPages - 1} onClick={() => updateParams(pagePatch(page + 1))} className="btn btn-secondary !py-1.5">
                 Next <ChevronRightIcon className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
@@ -304,7 +301,7 @@ export default function Sources() {
       {drawer && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={drawer.mode === 'add' ? 'Add source' : 'Edit source'}>
           <div className="absolute inset-0 bg-black/70" onClick={() => setDrawer(null)} />
-          <aside className="absolute right-0 top-0 bottom-0 w-full max-w-[480px] bg-night-900 border-l border-night-700 flex flex-col animate-fade-in overscroll-contain">
+          <aside id="source-drawer" tabIndex={-1} className="absolute right-0 top-0 bottom-0 w-full max-w-[480px] bg-night-900 border-l border-night-700 flex flex-col animate-fade-in overscroll-contain">
             <header className="px-5 py-4 border-b border-night-700 flex items-center justify-between">
               <div>
                 <p className="nw-eyebrow">{drawer.mode === 'add' ? 'New source' : 'Edit source'}</p>

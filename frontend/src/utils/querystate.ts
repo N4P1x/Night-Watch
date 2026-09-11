@@ -1,31 +1,45 @@
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-/** String state mirrored to a URL query param — filtered views stay shareable. */
-export function useQueryState(key: string, initial = ''): [string, (v: string) => void] {
+/**
+ * URL-synced filter state with ONE atomic writer.
+ *
+ * React Router navigations do not chain: two setParams calls in one handler
+ * each capture the current location, and the last navigation silently
+ * discards the first. So every interaction — filter change AND page reset —
+ * must commit in a single setParams call. Never call the updater twice per
+ * gesture; always fold everything into one patch object.
+ */
+export function useQueryParams(): [
+  URLSearchParams,
+  (patch: Record<string, string | null | undefined>) => void,
+] {
   const [params, setParams] = useSearchParams();
-  const value = params.get(key) ?? initial;
-  const set = useCallback(
-    (v: string) => {
+  const update = useCallback(
+    (patch: Record<string, string | null | undefined>) => {
       setParams(
         (prev) => {
           const next = new URLSearchParams(prev);
-          if (v) next.set(key, v);
-          else next.delete(key);
+          for (const [key, value] of Object.entries(patch)) {
+            if (value) next.set(key, value);
+            else next.delete(key);
+          }
           return next;
         },
         { replace: true },
       );
     },
-    [key, setParams],
+    [setParams],
   );
-  return [value, set];
+  return [params, update];
 }
 
-/** Page-number state mirrored to ?p= (1-based in URL, 0-based in code). */
-export function useQueryPage(key = 'p'): [number, (v: number) => void] {
-  const [raw, setRaw] = useQueryState(key, '');
-  const page = Math.max(0, (parseInt(raw, 10) || 1) - 1);
-  const set = useCallback((v: number) => setRaw(v <= 0 ? '' : String(v + 1)), [setRaw]);
-  return [page, set];
+/** 0-based page number backed by ?p= (1-based in the URL, absent = first). */
+export function pageFromParams(params: URLSearchParams): number {
+  return Math.max(0, (parseInt(params.get('p') ?? '', 10) || 1) - 1);
+}
+
+/** Patch fragment that moves to 0-based page n (?p= omitted on first). */
+export function pagePatch(n: number): Record<string, string | null> {
+  return { p: n <= 0 ? null : String(n + 1) };
 }

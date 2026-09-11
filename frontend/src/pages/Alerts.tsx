@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
 import { PageHeader, Stat, EmptyState, SkeletonRows, SeverityPill } from '../components/ui';
-import { useQueryState, useQueryPage } from '../utils/querystate';
+import { useQueryParams, pageFromParams, pagePatch } from '../utils/querystate';
 import { SEVERITY_ORDER } from '../utils/severity';
 import {
   CheckIcon,
@@ -13,16 +13,19 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function Alerts() {
-  const [page, setPage] = useQueryPage();
-  const [severity, setSeverity] = useQueryState('severity');
-  const [tab, setTab] = useQueryState('tab');
-  const tabValue = tab === 'unread' || tab === 'read' ? tab : 'all';
+  const [params, updateParams] = useQueryParams();
+  const severity = params.get('severity') ?? '';
+  const tabParam = params.get('tab');
+  const tabValue = tabParam === 'unread' || tabParam === 'read' ? tabParam : 'all';
+  const page = pageFromParams(params);
+  const setFilter = (patch: Record<string, string | null | undefined>) =>
+    updateParams({ ...patch, ...pagePatch(0) });
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const LIMIT = 20;
 
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
-    queryKey: ['alerts', page, tab, severity],
+    queryKey: ['alerts', page, tabValue, severity],
     queryFn: async () => {
       const params: any = { skip: page * LIMIT, limit: LIMIT };
       if (tabValue !== 'all') params.is_read = tabValue === 'read';
@@ -102,7 +105,7 @@ export default function Alerts() {
         <div className="nw-panel p-3 flex flex-col md:flex-row gap-2.5 md:items-center">
           <div className="flex gap-1.5" role="tablist" aria-label="Read state">
             {(['all', 'unread', 'read'] as const).map((v) => (
-              <button key={v} onClick={() => { setTab(v === 'all' ? '' : v); setPage(0); }} className={`nw-tab capitalize ${tabValue === v ? 'nw-tab-active' : ''}`}>
+              <button key={v} onClick={() => setFilter({ tab: v === 'all' ? null : v })} className={`nw-tab capitalize ${tabValue === v ? 'nw-tab-active' : ''}`}>
                 {v}
                 {v === 'unread' && unread > 0 && <span className="ml-1.5 font-mono tabular-nums text-sev-critical">{unread}</span>}
               </button>
@@ -110,11 +113,11 @@ export default function Alerts() {
           </div>
           <span className="hidden md:block w-px h-6 bg-night-700" />
           <div className="flex gap-1.5 flex-wrap">
-            <button onClick={() => { setSeverity(''); setPage(0); }} className={`nw-tab ${!severity ? 'nw-tab-active' : ''}`}>
+            <button onClick={() => setFilter({ severity: null })} className={`nw-tab ${!severity ? 'nw-tab-active' : ''}`}>
               All severities
             </button>
             {SEVERITY_ORDER.map((s) => (
-              <button key={s} onClick={() => { setSeverity(severity === s ? '' : s); setPage(0); }} className={`nw-tab capitalize ${severity === s ? 'nw-tab-active' : ''}`}>
+              <button key={s} onClick={() => setFilter({ severity: severity === s ? null : s })} className={`nw-tab capitalize ${severity === s ? 'nw-tab-active' : ''}`}>
                 {s}
               </button>
             ))}
@@ -174,13 +177,13 @@ export default function Alerts() {
           )}
           {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-night-700">
-            <button disabled={page === 0} onClick={() => setPage(Math.max(0, page - 1))} className="btn btn-secondary !py-1.5">
+            <button disabled={page === 0} onClick={() => updateParams(pagePatch(Math.max(0, page - 1)))} className="btn btn-secondary !py-1.5">
               <ChevronLeftIcon className="w-4 h-4" aria-hidden="true" /> Prev
             </button>
             <span className="font-mono text-[12px] text-ink-500 tabular-nums">
               {page + 1} / {totalPages}
             </span>
-            <button disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)} className="btn btn-secondary !py-1.5">
+            <button disabled={page >= totalPages - 1} onClick={() => updateParams(pagePatch(page + 1))} className="btn btn-secondary !py-1.5">
               Next <ChevronRightIcon className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
