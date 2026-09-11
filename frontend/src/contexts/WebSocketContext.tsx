@@ -41,38 +41,53 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     }
   }, [showToast])
 
+  // Timer refs must ALWAYS be nulled when cleared/consumed — a stale id
+  // permanently disables every `if (!ref.current)` retry guard below.
+  const clearRetry = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+  }, []);
+
+  const scheduleRetry = useCallback(() => {
+    clearRetry();
+    reconnectTimeoutRef.current = setTimeout(() => {
+      reconnectTimeoutRef.current = null;
+      connect();
+    }, 5000);
+  }, [clearRetry]);
+
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.CONNECTING || wsRef.current?.readyState === WebSocket.OPEN) {
       return
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/ws`
+    // JWT travels as ?token= — browsers can't set headers on WS upgrades,
+    // and /ws rejects anonymous connections (4401).
+    const token = localStorage.getItem('token')
+    if (!token) {
+      // Logged out — poll so a subsequent login picks up the channel.
+      scheduleRetry();
+      return
+    }
+    const wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`
 
-    console.log('Connecting to WebSocket:', wsUrl)
     const socket = new WebSocket(wsUrl)
     wsRef.current = socket
 
     socket.onopen = () => {
       setIsConnected(true)
       console.log('WebSocket connected')
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current)
-        reconnectTimeoutRef.current = null
-      }
+      clearRetry()
     }
 
     socket.onclose = () => {
       setIsConnected(false)
       wsRef.current = null
       console.log('WebSocket disconnected')
-      
-      if (!reconnectTimeoutRef.current) {
-        reconnectTimeoutRef.current = setTimeout(() => {
-          reconnectTimeoutRef.current = null
-          connect()
-        }, 5000)
-      }
+      scheduleRetry()
     }
 
     socket.onerror = (error) => {
@@ -119,12 +134,11 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     return () => {
       if (wsRef.current) {
         wsRef.current.close()
+        wsRef.current = null
       }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current)
-      }
+      clearRetry()
     }
-  }, [connect])
+  }, [connect, clearRetry])
 
   const sendMessage = useCallback((message: string) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {

@@ -11,6 +11,7 @@ from fastapi import (
     Depends,
     FastAPI,
     HTTPException,
+    Query,
     Request,
     WebSocket,
     WebSocketDisconnect,
@@ -25,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
 from backend.core.database import (
+    SessionLocal,
     close_mongo,
     close_redis,
     connect_mongo,
@@ -215,6 +217,19 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
     return current_user
 
 
+async def get_current_analyst(current_user: User = Depends(get_current_active_user)):
+    """Analyst or admin. Viewers are read-only across the console."""
+    if current_user.role not in ("admin", "analyst"):
+        raise HTTPException(status_code=403, detail="Analyst role or higher required")
+    return current_user
+
+
+async def get_current_admin(current_user: User = Depends(get_current_active_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+    return current_user
+
+
 @app.on_event("startup")
 async def startup():
     await connect_mongo()
@@ -229,7 +244,7 @@ async def shutdown():
 
 @app.get("/")
 async def root():
-    return {"message": "DWTIP API", "version": "1.0.0", "status": "running"}
+    return {"message": "Night-Watch API", "version": "1.0.0", "status": "running"}
 
 
 @app.get("/health")
@@ -313,7 +328,11 @@ async def update_me(
 
 @app.get("/api/v1/threat-actors", response_model=ThreatActorList)
 async def get_threat_actors(
-    skip: int = 0, limit: int = 50, search: str = None, db: Session = Depends(get_db)
+    skip: int = 0,
+    limit: int = 50,
+    search: str = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     query = db.query(ThreatActorModel)
     if search:
@@ -325,7 +344,11 @@ async def get_threat_actors(
 
 
 @app.post("/api/v1/threat-actors", response_model=ThreatActor)
-async def create_threat_actor(actor: ThreatActorCreate, db: Session = Depends(get_db)):
+async def create_threat_actor(
+    actor: ThreatActorCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_analyst),
+):
     db_actor = ThreatActorModel(**actor.model_dump())
     db.add(db_actor)
     db.commit()
@@ -334,7 +357,11 @@ async def create_threat_actor(actor: ThreatActorCreate, db: Session = Depends(ge
 
 
 @app.get("/api/v1/threat-actors/{actor_id}", response_model=ThreatActor)
-async def get_threat_actor(actor_id: int, db: Session = Depends(get_db)):
+async def get_threat_actor(
+    actor_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     actor = db.query(ThreatActorModel).filter(ThreatActorModel.id == actor_id).first()
     if not actor:
         raise HTTPException(status_code=404, detail="Threat actor not found")
@@ -346,13 +373,32 @@ async def update_threat_actor(
     actor_id: int,
     actor_update: dict,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_analyst),
 ):
     actor = db.query(ThreatActorModel).filter(ThreatActorModel.id == actor_id).first()
     if not actor:
         raise HTTPException(status_code=404, detail="Threat actor not found")
 
+    # Same philosophy as sources PUT: explicit whitelist, no id/timestamps.
     for key, value in actor_update.items():
-        if hasattr(actor, key):
+        if key in (
+            "aliases",
+            "description",
+            "motivation",
+            "sophistication",
+            "resource_level",
+            "primary_languages",
+            "target_industries",
+            "target_regions",
+            "ttps",
+            "associated_malware",
+            "associated_tools",
+            "associated_ransomware",
+            "tags",
+            "notes",
+            "risk_level",
+            "is_active",
+        ) and hasattr(actor, key):
             setattr(actor, key, value)
 
     db.commit()
@@ -389,6 +435,7 @@ async def get_leaks(
     source_url: str = None,
     is_onion: bool = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     query = db.query(LeakModel)
     if severity:
@@ -417,7 +464,11 @@ async def get_leaks(
 
 
 @app.post("/api/v1/leaks", response_model=Leak)
-async def create_leak(leak: LeakCreate, db: Session = Depends(get_db)):
+async def create_leak(
+    leak: LeakCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_analyst),
+):
     db_leak = LeakModel(**leak.model_dump())
     db.add(db_leak)
     db.commit()
@@ -440,7 +491,11 @@ async def create_leak(leak: LeakCreate, db: Session = Depends(get_db)):
 
 
 @app.get("/api/v1/leaks/{leak_id}", response_model=Leak)
-async def get_leak(leak_id: int, db: Session = Depends(get_db)):
+async def get_leak(
+    leak_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     leak = db.query(LeakModel).filter(LeakModel.id == leak_id).first()
     if not leak:
         raise HTTPException(status_code=404, detail="Leak not found")
@@ -471,6 +526,7 @@ async def get_iocs(
     search: str = None,
     source: str = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     query = db.query(IOCModel).filter(~IOCModel.is_whitelisted)
     if ioc_type:
@@ -487,7 +543,11 @@ async def get_iocs(
 
 
 @app.post("/api/v1/iocs", response_model=IOC)
-async def create_ioc(ioc: IOCCreate, db: Session = Depends(get_db)):
+async def create_ioc(
+    ioc: IOCCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_analyst),
+):
     existing = db.query(IOCModel).filter(IOCModel.value == ioc.value).first()
     if existing:
         raise HTTPException(status_code=400, detail="IOC already exists")
@@ -499,7 +559,11 @@ async def create_ioc(ioc: IOCCreate, db: Session = Depends(get_db)):
 
 
 @app.post("/api/v1/iocs/bulk", response_model=list[IOC])
-async def create_iocs_bulk(iocs_data: list[IOCCreate], db: Session = Depends(get_db)):
+async def create_iocs_bulk(
+    iocs_data: list[IOCCreate],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_analyst),
+):
     created = []
     for ioc_data in iocs_data:
         existing = db.query(IOCModel).filter(IOCModel.value == ioc_data.value).first()
@@ -536,6 +600,7 @@ async def get_sources(
     source_type: str = None,
     is_active: bool = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     query = db.query(SourceModel)
     if is_active is not None:
@@ -548,19 +613,29 @@ async def get_sources(
 
 
 @app.get("/api/v1/sources/types")
-async def get_source_types(db: Session = Depends(get_db)):
+async def get_source_types(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     types = db.query(SourceModel.type).distinct().limit(100).all()
     return {"types": [t[0] for t in types if t[0]]}
 
 
 @app.get("/api/v1/sources/names")
-async def get_source_names(db: Session = Depends(get_db)):
+async def get_source_names(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     sources = db.query(SourceModel.name).distinct().limit(100).all()
     return {"names": [s[0] for s in sources if s[0]]}
 
 
 @app.post("/api/v1/sources", response_model=Source)
-async def create_source(source: SourceCreate, db: Session = Depends(get_db)):
+async def create_source(
+    source: SourceCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_analyst),
+):
     db_source = SourceModel(**source.model_dump())
     db.add(db_source)
     db.commit()
@@ -570,7 +645,10 @@ async def create_source(source: SourceCreate, db: Session = Depends(get_db)):
 
 @app.put("/api/v1/sources/{source_id}", response_model=Source)
 async def update_source(
-    source_id: int, source_update: dict, db: Session = Depends(get_db)
+    source_id: int,
+    source_update: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_analyst),
 ):
     source = db.query(SourceModel).filter(SourceModel.id == source_id).first()
     if not source:
@@ -597,7 +675,10 @@ async def update_source(
 
 
 @app.post("/api/v1/sources/import-deepdarkcti")
-async def import_deepdarkcti_sources(db: Session = Depends(get_db)):
+async def import_deepdarkcti_sources(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_analyst),
+):
     import os
 
     base_path = os.environ.get("DWTIP_ROOT", "/app")
@@ -680,7 +761,8 @@ async def import_deepdarkcti_sources(db: Session = Depends(get_db)):
 
 @app.get("/api/v1/posts", response_model=PostList)
 async def get_posts(
-    skip: int = 0, limit: int = 50, search: str = None, db: Session = Depends(get_db)
+    skip: int = 0, limit: int = 50, search: str = None, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     query = db.query(PostModel)
     if search:
@@ -694,7 +776,11 @@ async def get_posts(
 
 
 @app.post("/api/v1/posts", response_model=Post)
-async def create_post(post: PostCreate, db: Session = Depends(get_db)):
+async def create_post(
+    post: PostCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_analyst),
+):
     import hashlib
 
     content_hash = hashlib.sha256((post.content or "").encode()).hexdigest()
@@ -729,7 +815,11 @@ async def get_alerts(
 
 
 @app.post("/api/v1/alerts", response_model=Alert)
-async def create_alert(alert: AlertCreate, db: Session = Depends(get_db)):
+async def create_alert(
+    alert: AlertCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_analyst),
+):
     db_alert = AlertModel(**alert.model_dump())
     db.add(db_alert)
     db.commit()
@@ -788,7 +878,10 @@ async def delete_alert(
 
 
 @app.get("/api/v1/stats/dashboard")
-async def get_dashboard_stats(db: Session = Depends(get_db)):
+async def get_dashboard_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     total_actors = db.query(ThreatActorModel).count()
     active_actors = (
         db.query(ThreatActorModel).filter(ThreatActorModel.is_active).count()
@@ -862,7 +955,7 @@ def run_scraper(scraper_path, base_path, stats_file):
 @app.post("/api/v1/scrape/trigger")
 async def trigger_scrape(
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     import os
@@ -897,6 +990,7 @@ async def trigger_scrape(
 @app.get("/api/v1/scrape/status")
 async def get_scrape_status(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     import os
 
@@ -918,7 +1012,7 @@ async def get_scrape_status(
 
 
 @app.post("/api/v1/scrape/stop")
-async def stop_scrape():
+async def stop_scrape(current_user: User = Depends(get_current_admin)):
     import os
 
     stats_file = "/tmp/dwtip_scrape_status.json"
@@ -937,7 +1031,20 @@ async def stop_scrape():
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(default=None)):
+    """Live channel. Browsers can't set WS headers, so the JWT travels as
+    ?token=. Missing/invalid tokens are rejected before any broadcast."""
+    if not token:
+        await websocket.close(code=4401)
+        return
+    db = SessionLocal()
+    try:
+        await get_current_active_user(await get_current_user(token, db))
+    except HTTPException:
+        await websocket.close(code=4401)
+        return
+    finally:
+        db.close()
     await manager.connect(websocket)
     try:
         while True:
