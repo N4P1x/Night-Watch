@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
 import { PageHeader, Stat, EmptyState, SkeletonRows, SeverityPill } from '../components/ui';
+import { useQueryParams, pageFromParams, pagePatch } from '../utils/querystate';
 import { SEVERITY_ORDER } from '../utils/severity';
 import {
   CheckIcon,
@@ -13,18 +13,22 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function Alerts() {
-  const [page, setPage] = useState(0);
-  const [severity, setSeverity] = useState('');
-  const [tab, setTab] = useState<'all' | 'unread' | 'read'>('all');
+  const [params, updateParams] = useQueryParams();
+  const severity = params.get('severity') ?? '';
+  const tabParam = params.get('tab');
+  const tabValue = tabParam === 'unread' || tabParam === 'read' ? tabParam : 'all';
+  const page = pageFromParams(params);
+  const setFilter = (patch: Record<string, string | null | undefined>) =>
+    updateParams({ ...patch, ...pagePatch(0) });
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const LIMIT = 20;
 
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
-    queryKey: ['alerts', page, tab, severity],
+    queryKey: ['alerts', page, tabValue, severity],
     queryFn: async () => {
       const params: any = { skip: page * LIMIT, limit: LIMIT };
-      if (tab !== 'all') params.is_read = tab === 'read';
+      if (tabValue !== 'all') params.is_read = tabValue === 'read';
       if (severity) params.severity = severity;
       return (await api.get('/v1/alerts', { params })).data;
     },
@@ -75,17 +79,16 @@ export default function Alerts() {
   return (
     <div className="min-h-full">
       <PageHeader
-        eyebrow="Operations · Triage"
         title="Threat alerts"
         description={<>{unread > 0 ? <span className="text-sev-critical font-semibold">{unread} unread need attention.</span> : 'All caught up.'}</>}
         actions={
           <>
             <button onClick={() => refetch()} disabled={isFetching} className="btn btn-secondary">
-              <ArrowPathIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
+              <ArrowPathIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} aria-hidden="true" /> Refresh
             </button>
             {unread > 0 && (
               <button onClick={() => markAll.mutate()} disabled={markAll.isPending} className="btn btn-secondary">
-                <CheckIcon className="w-4 h-4" /> Mark page read
+                <CheckIcon className="w-4 h-4" aria-hidden="true" /> Mark page read
               </button>
             )}
           </>
@@ -95,14 +98,14 @@ export default function Alerts() {
       <div className="px-6 py-5 space-y-4 max-w-[1200px]">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <Stat label="Total" value={data?.total ?? 0} />
-          <Stat label="Unread" value={unread} accent="critical" />
+          <Stat label="Unread" value={unread} />
           <Stat label="On page" value={data?.alerts?.length ?? 0} />
         </div>
 
         <div className="nw-panel p-3 flex flex-col md:flex-row gap-2.5 md:items-center">
           <div className="flex gap-1.5" role="tablist" aria-label="Read state">
             {(['all', 'unread', 'read'] as const).map((v) => (
-              <button key={v} onClick={() => { setTab(v); setPage(0); }} className={`nw-tab capitalize ${tab === v ? 'nw-tab-active' : ''}`}>
+              <button key={v} onClick={() => setFilter({ tab: v === 'all' ? null : v })} className={`nw-tab capitalize ${tabValue === v ? 'nw-tab-active' : ''}`}>
                 {v}
                 {v === 'unread' && unread > 0 && <span className="ml-1.5 font-mono tabular-nums text-sev-critical">{unread}</span>}
               </button>
@@ -110,11 +113,11 @@ export default function Alerts() {
           </div>
           <span className="hidden md:block w-px h-6 bg-night-700" />
           <div className="flex gap-1.5 flex-wrap">
-            <button onClick={() => { setSeverity(''); setPage(0); }} className={`nw-tab ${!severity ? 'nw-tab-active' : ''}`}>
+            <button onClick={() => setFilter({ severity: null })} className={`nw-tab ${!severity ? 'nw-tab-active' : ''}`}>
               All severities
             </button>
             {SEVERITY_ORDER.map((s) => (
-              <button key={s} onClick={() => { setSeverity(severity === s ? '' : s); setPage(0); }} className={`nw-tab capitalize ${severity === s ? 'nw-tab-active' : ''}`}>
+              <button key={s} onClick={() => setFilter({ severity: severity === s ? null : s })} className={`nw-tab capitalize ${severity === s ? 'nw-tab-active' : ''}`}>
                 {s}
               </button>
             ))}
@@ -130,7 +133,7 @@ export default function Alerts() {
             </div>
           ) : !data?.alerts?.length ? (
             <div className="p-4">
-              <EmptyState title={unread === 0 && tab !== 'read' ? 'Inbox zero' : 'No alerts match'} hint="New alerts arrive from scrape runs and keyword matches." />
+              <EmptyState title={unread === 0 && tabValue !== 'read' ? 'All clear' : 'No alerts match'} hint="New alerts arrive from scrape runs and keyword matches." />
             </div>
           ) : (
             <ul className="divide-y divide-night-700/70">
@@ -157,13 +160,14 @@ export default function Alerts() {
                         onClick={() => setRead.mutate({ id: a.id, is_read: true })}
                         className="btn btn-ghost !px-2 !py-1.5 text-[12px]"
                         title="Mark read"
+                        aria-label={`Mark alert ${a.title} as read`}
                       >
-                        <CheckIcon className="w-4 h-4" />
+                        <CheckIcon className="w-4 h-4" aria-hidden="true" />
                       </button>
                     )}
                     {!a.is_dismissed && (
-                      <button onClick={() => dismiss.mutate(a.id)} className="btn btn-ghost !px-2 !py-1.5 hover:!text-sev-critical" title="Dismiss">
-                        <XMarkIcon className="w-4 h-4" />
+                      <button onClick={() => dismiss.mutate(a.id)} className="btn btn-ghost !px-2 !py-1.5 hover:!text-sev-critical" title="Dismiss" aria-label={`Dismiss alert ${a.title}`}>
+                        <XMarkIcon className="w-4 h-4" aria-hidden="true" />
                       </button>
                     )}
                   </div>
@@ -171,17 +175,19 @@ export default function Alerts() {
               ))}
             </ul>
           )}
+          {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-night-700">
-            <button disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="btn btn-secondary !py-1.5">
-              <ChevronLeftIcon className="w-4 h-4" /> Prev
+            <button disabled={page === 0} onClick={() => updateParams(pagePatch(Math.max(0, page - 1)))} className="btn btn-secondary !py-1.5">
+              <ChevronLeftIcon className="w-4 h-4" aria-hidden="true" /> Prev
             </button>
             <span className="font-mono text-[12px] text-ink-500 tabular-nums">
               {page + 1} / {totalPages}
             </span>
-            <button disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)} className="btn btn-secondary !py-1.5">
-              Next <ChevronRightIcon className="w-4 h-4" />
+            <button disabled={page >= totalPages - 1} onClick={() => updateParams(pagePatch(page + 1))} className="btn btn-secondary !py-1.5">
+              Next <ChevronRightIcon className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
+          )}
         </div>
       </div>
     </div>

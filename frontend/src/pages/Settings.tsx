@@ -47,12 +47,11 @@ export default function Settings() {
   return (
     <div className="min-h-full">
       <PageHeader
-        eyebrow="System · Preferences"
         title="Settings"
         description={<>Signed in as <span className="font-mono text-ink-100">{user?.username}</span> · role <span className="badge badge-neutral ml-1">{userData?.role ?? user?.role}</span></>}
         actions={
           <button onClick={() => refetch()} disabled={isFetching} className="btn btn-secondary">
-            <ArrowPathIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
+            <ArrowPathIcon aria-hidden="true" className={`w-4 h-4 ${isFetching} ? 'animate-spin' : ''}`} /> Refresh
           </button>
         }
       />
@@ -96,17 +95,24 @@ export default function Settings() {
 
         <Section title="Alert keywords" hint="Notified when these appear in new leaks.">
           <div className="flex gap-2">
-            <input
-              className="input font-mono"
-              placeholder="e.g. lockbit, CVE-2024-, .onion"
-              value={newKeyword}
-              onChange={(e) => setNewKeyword(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') addKeyword();
-              }}
-            />
+            <label className="flex-1" htmlFor="settings-keyword">
+              <span className="sr-only">Add alert keyword</span>
+              <input
+                id="settings-keyword"
+                name="keyword"
+                className="input font-mono"
+                placeholder="e.g. lockbit, CVE-2024-, .onion"
+                value={newKeyword}
+                onChange={(e) => setNewKeyword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') addKeyword();
+                }}
+                spellCheck={false}
+                autoComplete="off"
+              />
+            </label>
             <button onClick={addKeyword} className="btn btn-primary flex-shrink-0" aria-label="Add keyword">
-              <PlusIcon className="w-4 h-4" /> Add
+              <PlusIcon className="w-4 h-4" aria-hidden="true" /> Add
             </button>
           </div>
           <div className="flex flex-wrap gap-1.5 mt-3">
@@ -114,7 +120,7 @@ export default function Settings() {
               <span key={kw} className="badge badge-brand !normal-case !tracking-normal font-mono">
                 {kw}
                 <button onClick={() => removeKeyword(kw)} className="hover:text-sev-critical ml-0.5" aria-label={`Remove ${kw}`}>
-                  <TrashIcon className="w-3.5 h-3.5" />
+                  <TrashIcon className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
               </span>
             ))}
@@ -170,7 +176,7 @@ function NotifRow({ id, label, desc, defaultOn }: { id: string; label: string; d
           setOn(e.target.checked);
           localStorage.setItem(id, e.target.checked ? '1' : '0');
         }}
-        className="w-4 h-4 accent-[#F0A832]"
+        className="w-4 h-4 accent-[#5e6ad2]"
         aria-label={label}
       />
     </label>

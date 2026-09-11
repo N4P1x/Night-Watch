@@ -10,7 +10,7 @@ function BrandPanel() {
       <div>
         <div className="flex items-center gap-3">
           <span className="w-9 h-9 rounded-md bg-brand flex items-center justify-center">
-            <ShieldCheckIcon className="w-5 h-5 text-black" strokeWidth={2.25} />
+            <ShieldCheckIcon className="w-5 h-5 text-black" strokeWidth={2.25} aria-hidden="true" />
           </span>
           <span>
             <span className="block text-[14px] font-bold tracking-[0.16em] text-white">NIGHT-WATCH</span>
@@ -76,7 +76,7 @@ export default function Login() {
         <div className="w-full max-w-[400px]">
           <div className="lg:hidden flex items-center gap-2.5 mb-8">
             <span className="w-8 h-8 rounded-md bg-brand flex items-center justify-center">
-              <ShieldCheckIcon className="w-5 h-5 text-black" />
+              <ShieldCheckIcon className="w-5 h-5 text-black" aria-hidden="true" />
             </span>
             <span className="text-[13px] font-bold tracking-[0.14em]">NIGHT-WATCH</span>
           </div>
@@ -93,11 +93,13 @@ export default function Login() {
               </label>
               <input
                 id="login-user"
+                name="username"
                 type="text"
                 className="input font-mono"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoComplete="username"
+                spellCheck={false}
                 required
                 autoFocus
               />
@@ -109,6 +111,7 @@ export default function Login() {
               <div className="relative">
                 <input
                   id="login-pass"
+                  name="password"
                   type={showPw ? 'text' : 'password'}
                   className="input pr-10"
                   value={password}
@@ -122,7 +125,7 @@ export default function Login() {
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-ink-500 hover:text-white"
                   aria-label={showPw ? 'Hide password' : 'Show password'}
                 >
-                  {showPw ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
+                  {showPw ? <EyeSlashIcon className="w-4 h-4" aria-hidden="true" /> : <EyeIcon className="w-4 h-4" aria-hidden="true" />}
                 </button>
               </div>
             </div>

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
-import { PageHeader, Section, Stat, SeverityPill, StatusDot, EmptyState, SkeletonRows } from '../components/ui';
+import { PageHeader, Section, Stat, SeverityPill, StatusDot, EmptyState, SkeletonRows, rowKeyboardProps } from '../components/ui';
 import { SEVERITY_ORDER, SEVERITY_HEX, SEVERITY_BAR, normalizeSeverity } from '../utils/severity';
 import {
   PlayIcon,
@@ -114,7 +114,6 @@ export default function Dashboard() {
   return (
     <div className="min-h-full">
       <PageHeader
-        eyebrow={isAdmin ? 'Operations · Admin' : `Operations · ${user?.role ?? 'Viewer'}`}
         title="Operations overview"
         description={
           <>
@@ -126,18 +125,18 @@ export default function Dashboard() {
         actions={
           <>
             <button onClick={() => refetch()} disabled={isFetching} className="btn btn-secondary" title="Refresh">
-              <ArrowPathIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              <ArrowPathIcon aria-hidden="true" className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
               Refresh
             </button>
             {isAdmin &&
               (!isScraping ? (
                 <button onClick={handleStartScrape} className="btn btn-primary">
-                  <PlayIcon className="w-4 h-4" />
+                  <PlayIcon className="w-4 h-4" aria-hidden="true" />
                   Start scrape
                 </button>
               ) : (
                 <button onClick={handleStopScrape} className="btn btn-danger">
-                  <StopIcon className="w-4 h-4" />
+                  <StopIcon className="w-4 h-4" aria-hidden="true" />
                   Stop
                 </button>
               ))}
@@ -190,28 +189,24 @@ export default function Dashboard() {
               label="Total leaks"
               value={(stats?.leaks?.total ?? 0).toLocaleString()}
               sub={`${stats?.leaks?.new_today ?? 0} new today`}
-              accent="critical"
               onClick={() => navigate('/leaks')}
             />
             <Stat
               label="Threat actors"
               value={(stats?.threat_actors?.total ?? 0).toLocaleString()}
               sub={`${stats?.threat_actors?.active ?? 0} active`}
-              accent="high"
               onClick={() => navigate('/actors')}
             />
             <Stat
               label="IOCs"
               value={(stats?.iocs?.total ?? 0).toLocaleString()}
               sub="Indicators of compromise"
-              accent="medium"
               onClick={() => navigate('/iocs')}
             />
             <Stat
               label="Active sources"
               value={(stats?.sources?.active ?? 0).toLocaleString()}
               sub="Tor + clearnet feeds"
-              accent="low"
               onClick={() => navigate('/sources')}
             />
           </div>
@@ -224,7 +219,7 @@ export default function Dashboard() {
             className="xl:col-span-2"
             action={
               <button onClick={() => navigate('/leaks')} className="btn btn-ghost !px-2 !py-1 text-[12.5px]">
-                Open leaks <ArrowRightIcon className="w-3.5 h-3.5" />
+                Open leaks <ArrowRightIcon className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
             }
           >
@@ -259,7 +254,7 @@ export default function Dashboard() {
             hint="By recent activity"
             action={
               <button onClick={() => navigate('/actors')} className="btn btn-ghost !px-2 !py-1 text-[12.5px]">
-                View all <ArrowRightIcon className="w-3.5 h-3.5" />
+                View all <ArrowRightIcon className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
             }
           >
@@ -295,7 +290,7 @@ export default function Dashboard() {
             className="xl:col-span-2 !p-0 overflow-hidden"
             action={
               <button onClick={() => navigate('/leaks')} className="btn btn-ghost !px-2 !py-1 text-[12.5px]">
-                View all <ArrowRightIcon className="w-3.5 h-3.5" />
+                View all <ArrowRightIcon className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
             }
           >
@@ -317,7 +312,12 @@ export default function Dashboard() {
                   {recentLeaks.leaks.slice(0, 5).map((leak: any) => {
                     const sev = normalizeSeverity(leak.severity);
                     return (
-                      <tr key={leak.id} onClick={() => navigate('/leaks')} className="cursor-pointer">
+                      <tr
+                        key={leak.id}
+                        onClick={() => navigate('/leaks')}
+                        className="cursor-pointer"
+                        {...rowKeyboardProps(() => navigate('/leaks'), `Open leak ${leak.title}`)}
+                      >
                         <td>
                           <SeverityPill value={sev} />
                         </td>

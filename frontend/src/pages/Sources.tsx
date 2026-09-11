@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
-import { PageHeader, EmptyState, SkeletonRows } from '../components/ui';
+import { PageHeader, EmptyState, SkeletonRows, useDrawerFocus } from '../components/ui';
+import { useQueryParams, pageFromParams, pagePatch } from '../utils/querystate';
 import {
   PlusIcon,
   XMarkIcon,
@@ -45,21 +46,35 @@ const EMPTY_FORM = {
 };
 
 export default function Sources() {
-  const [page, setPage] = useState(0);
-  const [sourceType, setSourceType] = useState('');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [params, updateParams] = useQueryParams();
+  const sourceType = params.get('type') ?? '';
+  const activeParam = params.get('status');
+  const activeValue = activeParam === 'active' || activeParam === 'inactive' ? activeParam : 'all';
+  const page = pageFromParams(params);
+  const setFilter = (patch: Record<string, string | null | undefined>) =>
+    updateParams({ ...patch, ...pagePatch(0) });
   const [drawer, setDrawer] = useState<null | { mode: 'add' } | { mode: 'edit'; source: any }>(null);
   const [form, setForm] = useState<any>(EMPTY_FORM);
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const LIMIT = 20;
 
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDrawer(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawer]);
+  useDrawerFocus(!!drawer, 'source-drawer');
+
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['sources', page, sourceType, activeFilter],
+    queryKey: ['sources', page, sourceType, activeValue],
     queryFn: async () => {
       const params: any = { skip: page * LIMIT, limit: LIMIT };
       if (sourceType) params.source_type = sourceType;
-      if (activeFilter !== 'all') params.is_active = activeFilter === 'active';
+      if (activeValue !== 'all') params.is_active = activeValue === 'active';
       return (await api.get('/v1/sources', { params })).data;
     },
     refetchInterval: 30000,
@@ -151,7 +166,6 @@ export default function Sources() {
   return (
     <div className="min-h-full">
       <PageHeader
-        eyebrow="Operations · Collection"
         title="Data sources"
         description={
           <>{(data?.total ?? 0).toLocaleString()} sources · {activeCount} active on this page.</>
@@ -159,14 +173,14 @@ export default function Sources() {
         actions={
           <>
             <button onClick={() => refetch()} disabled={isFetching} className="btn btn-secondary">
-              <ArrowPathIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
+              <ArrowPathIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} aria-hidden="true" /> Refresh
             </button>
             <button onClick={importDeepdark} className="btn btn-secondary">Import deepdarkCTI</button>
             <button onClick={scrapeAll} className="btn btn-secondary">
-              <PlayIcon className="w-4 h-4" /> Scrape all
+              <PlayIcon className="w-4 h-4" aria-hidden="true" /> Scrape all
             </button>
             <button onClick={openAdd} className="btn btn-primary">
-              <PlusIcon className="w-4 h-4" /> Add source
+              <PlusIcon className="w-4 h-4" aria-hidden="true" /> Add source
             </button>
           </>
         }
@@ -178,30 +192,23 @@ export default function Sources() {
             {(['all', 'active', 'inactive'] as const).map((v) => (
               <button
                 key={v}
-                onClick={() => {
-                  setActiveFilter(v);
-                  setPage(0);
-                }}
-                className={`nw-tab capitalize ${activeFilter === v ? 'nw-tab-active' : ''}`}
+                onClick={() => setFilter({ status: v === 'all' ? null : v })}
+                className={`nw-tab capitalize ${activeValue === v ? 'nw-tab-active' : ''}`}
               >
                 {v}
               </button>
             ))}
           </div>
           <span className="hidden md:block w-px h-6 bg-night-700" />
-          <select value={sourceType} onChange={(e) => { setSourceType(e.target.value); setPage(0); }} className="input !w-auto" aria-label="Type">
+          <select value={sourceType} onChange={(e) => setFilter({ type: e.target.value || null })} className="input !w-auto" aria-label="Type">
             <option value="">All types</option>
             {SOURCE_TYPES.map((t) => (
               <option key={t.id} value={t.id}>{t.label}</option>
             ))}
           </select>
-          {(sourceType || activeFilter !== 'all') && (
+          {(sourceType || activeValue !== 'all') && (
             <button
-              onClick={() => {
-                setSourceType('');
-                setActiveFilter('all');
-                setPage(0);
-              }}
+              onClick={() => setFilter({ type: null, status: null })}
               className="btn btn-ghost text-[12.5px]"
             >
               Clear
@@ -219,7 +226,7 @@ export default function Sources() {
                 hint="Add your first source to start collection."
                 action={
                   <button onClick={openAdd} className="btn btn-primary">
-                    <PlusIcon className="w-4 h-4" /> Add source
+                    <PlusIcon className="w-4 h-4" aria-hidden="true" /> Add source
                   </button>
                 }
               />
@@ -265,8 +272,8 @@ export default function Sources() {
                         >
                           {s.is_active ? 'Disable' : 'Enable'}
                         </button>
-                        <button onClick={() => openEdit(s)} className="btn btn-ghost !px-2 !py-1.5" title="Edit">
-                          <PencilIcon className="w-4 h-4" />
+                        <button onClick={() => openEdit(s)} className="btn btn-ghost !px-2 !py-1.5" title="Edit" aria-label={`Edit ${s.name}`}>
+                          <PencilIcon className="w-4 h-4" aria-hidden="true" />
                         </button>
                       </td>
                     </tr>
@@ -277,14 +284,14 @@ export default function Sources() {
           )}
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-night-700">
-              <button disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="btn btn-secondary !py-1.5">
-                <ChevronLeftIcon className="w-4 h-4" /> Prev
+              <button disabled={page === 0} onClick={() => updateParams(pagePatch(Math.max(0, page - 1)))} className="btn btn-secondary !py-1.5">
+                <ChevronLeftIcon className="w-4 h-4" aria-hidden="true" /> Prev
               </button>
               <span className="font-mono text-[12px] text-ink-500 tabular-nums">
                 {page + 1} / {totalPages} · {(data?.total ?? 0).toLocaleString()} total
               </span>
-              <button disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)} className="btn btn-secondary !py-1.5">
-                Next <ChevronRightIcon className="w-4 h-4" />
+              <button disabled={page >= totalPages - 1} onClick={() => updateParams(pagePatch(page + 1))} className="btn btn-secondary !py-1.5">
+                Next <ChevronRightIcon className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
           )}
@@ -294,7 +301,7 @@ export default function Sources() {
       {drawer && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={drawer.mode === 'add' ? 'Add source' : 'Edit source'}>
           <div className="absolute inset-0 bg-black/70" onClick={() => setDrawer(null)} />
-          <aside className="absolute right-0 top-0 bottom-0 w-full max-w-[480px] bg-night-900 border-l border-night-700 flex flex-col animate-slide-up">
+          <aside id="source-drawer" tabIndex={-1} className="absolute right-0 top-0 bottom-0 w-full max-w-[480px] bg-night-900 border-l border-night-700 flex flex-col animate-fade-in overscroll-contain">
             <header className="px-5 py-4 border-b border-night-700 flex items-center justify-between">
               <div>
                 <p className="nw-eyebrow">{drawer.mode === 'add' ? 'New source' : 'Edit source'}</p>
@@ -303,36 +310,36 @@ export default function Sources() {
                 </p>
               </div>
               <button onClick={() => setDrawer(null)} className="btn-ghost btn !px-2" aria-label="Close">
-                <XMarkIcon className="w-5 h-5" />
+                <XMarkIcon className="w-5 h-5" aria-hidden="true" />
               </button>
             </header>
             <div className="flex-1 overflow-y-auto scrollbar p-5 space-y-4">
               <div>
-                <label className="nw-label">Name *</label>
-                <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="BreachForums mirror" />
+                <label className="nw-label" htmlFor="src-name">Name *</label>
+                <input id="src-name" className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="BreachForums mirror" />
               </div>
               <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <label className="nw-label">Surface URL</label>
-                  <input className="input font-mono" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://…" />
+                  <label className="nw-label" htmlFor="src-url">Surface URL</label>
+                  <input id="src-url" type="url" inputMode="url" className="input font-mono" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://…" />
                 </div>
                 <div>
-                  <label className="nw-label">Onion URL</label>
-                  <input className="input font-mono" value={form.onion_url} onChange={(e) => setForm({ ...form, onion_url: e.target.value })} placeholder="http://….onion" />
+                  <label className="nw-label" htmlFor="src-onion">Onion URL</label>
+                  <input id="src-onion" type="url" inputMode="url" className="input font-mono" value={form.onion_url} onChange={(e) => setForm({ ...form, onion_url: e.target.value })} placeholder="http://….onion" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="nw-label">Type</label>
-                  <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                  <label className="nw-label" htmlFor="src-type">Type</label>
+                  <select id="src-type" className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
                     {SOURCE_TYPES.map((t) => (
                       <option key={t.id} value={t.id}>{t.label}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="nw-label">Language</label>
-                  <select className="input" value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })}>
+                  <label className="nw-label" htmlFor="src-lang">Language</label>
+                  <select id="src-lang" className="input" value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })}>
                     {['en', 'ru', 'zh', 'es', 'de', 'fr', 'other'].map((l) => (
                       <option key={l} value={l}>{l}</option>
                     ))}
@@ -340,8 +347,9 @@ export default function Sources() {
                 </div>
               </div>
               <div>
-                <label className="nw-label">Interval</label>
+                <label className="nw-label" htmlFor="src-interval">Interval</label>
                 <select
+                  id="src-interval"
                   className="input"
                   value={form.scrape_interval_minutes}
                   onChange={(e) => setForm({ ...form, scrape_interval_minutes: parseInt(e.target.value, 10) })}
@@ -352,16 +360,16 @@ export default function Sources() {
                 </select>
               </div>
               <div>
-                <label className="nw-label">Description</label>
-                <textarea className="input min-h-[72px]" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                <label className="nw-label" htmlFor="src-desc">Description</label>
+                <textarea id="src-desc" className="input min-h-[72px]" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               </div>
               <div className="flex gap-5">
                 <label className="flex items-center gap-2 text-[13px] cursor-pointer">
-                  <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="w-4 h-4 accent-[#F0A832]" />
+                  <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="w-4 h-4 accent-[#5e6ad2]" />
                   Active
                 </label>
                 <label className="flex items-center gap-2 text-[13px] cursor-pointer">
-                  <input type="checkbox" checked={form.uses_tor} onChange={(e) => setForm({ ...form, uses_tor: e.target.checked })} className="w-4 h-4 accent-[#F0A832]" />
+                  <input type="checkbox" checked={form.uses_tor} onChange={(e) => setForm({ ...form, uses_tor: e.target.checked })} className="w-4 h-4 accent-[#5e6ad2]" />
                   Requires Tor
                 </label>
               </div>

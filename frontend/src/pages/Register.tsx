@@ -44,7 +44,7 @@ export default function Register() {
         <div>
           <div className="flex items-center gap-3">
             <span className="w-9 h-9 rounded-md bg-brand flex items-center justify-center">
-              <ShieldCheckIcon className="w-5 h-5 text-black" strokeWidth={2.25} />
+              <ShieldCheckIcon className="w-5 h-5 text-black" strokeWidth={2.25} aria-hidden="true" />
             </span>
             <span>
               <span className="block text-[14px] font-bold tracking-[0.16em] text-white">NIGHT-WATCH</span>
@@ -78,11 +78,11 @@ export default function Register() {
             <FieldError message={error} />
             <div>
               <label className="nw-label" htmlFor="reg-email">Email</label>
-              <input id="reg-email" type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+              <input id="reg-email" name="email" type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" spellCheck={false} required />
             </div>
             <div>
               <label className="nw-label" htmlFor="reg-user">Username</label>
-              <input id="reg-user" type="text" className="input font-mono" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required />
+              <input id="reg-user" name="username" type="text" className="input font-mono" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" spellCheck={false} required />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -90,7 +90,7 @@ export default function Register() {
                 <div className="relative">
                   <input id="reg-pass" type={showPw ? 'text' : 'password'} className="input pr-10" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required />
                   <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-ink-500 hover:text-white" aria-label="Toggle password">
-                    {showPw ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
+                    {showPw ? <EyeSlashIcon className="w-4 h-4" aria-hidden="true" /> : <EyeIcon className="w-4 h-4" aria-hidden="true" />}
                   </button>
                 </div>
               </div>

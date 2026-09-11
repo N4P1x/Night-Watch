@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
-import { PageHeader, Section, EmptyState, SkeletonRows } from '../components/ui';
+import { PageHeader, Section, EmptyState, SkeletonRows, SearchInput, rowKeyboardProps, useDrawerFocus } from '../components/ui';
+import { useQueryParams, pageFromParams, pagePatch } from '../utils/querystate';
 import {
   MagnifyingGlassIcon,
   ClipboardDocumentIcon,
@@ -17,7 +18,7 @@ import {
 const IOC_TYPES = [
   { id: 'ip', label: 'IP', color: '#4CC2FF' },
   { id: 'domain', label: 'Domain', color: '#A78BFA' },
-  { id: 'file_hash', label: 'File hash', color: '#F0A832' },
+  { id: 'file_hash', label: 'File hash', color: '#D946EF' },
   { id: 'cve', label: 'CVE', color: '#FF5C5C' },
   { id: 'crypto_wallet', label: 'Wallet', color: '#FF9F43' },
   { id: 'email', label: 'Email', color: '#3DDC97' },
@@ -33,15 +34,28 @@ function typeLabel(id: string) {
 }
 
 export default function IOCs() {
-  const [search, setSearch] = useState('');
-  const [iocType, setIocType] = useState('');
-  const [source, setSource] = useState('');
-  const [page, setPage] = useState(0);
+  const [params, updateParams] = useQueryParams();
+  const search = params.get('q') ?? '';
+  const iocType = params.get('type') ?? '';
+  const source = params.get('source') ?? '';
+  const page = pageFromParams(params);
+  const setFilter = (patch: Record<string, string | null | undefined>) =>
+    updateParams({ ...patch, ...pagePatch(0) });
   const [selected, setSelected] = useState<any>(null);
   const [isScraping, setIsScraping] = useState(false);
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const LIMIT = 25;
+
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelected(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selected]);
+  useDrawerFocus(!!selected, 'ioc-drawer');
 
   const { data: sourcesData } = useQuery({
     queryKey: ['ioc-sources'],
@@ -102,19 +116,18 @@ export default function IOCs() {
   return (
     <div className="min-h-full">
       <PageHeader
-        eyebrow="Intelligence · Indicators"
         title="Indicators of compromise"
         description={<>{(data?.total ?? 0).toLocaleString()} IOCs · click a row for detail, hover for copy.</>}
         actions={
           <>
             <button onClick={() => refetch()} disabled={isFetching} className="btn btn-secondary">
-              <ArrowPathIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
+              <ArrowPathIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} aria-hidden="true" /> Refresh
             </button>
             <button onClick={exportCSV} className="btn btn-secondary">
-              <ArrowDownTrayIcon className="w-4 h-4" /> CSV
+              <ArrowDownTrayIcon className="w-4 h-4" aria-hidden="true" /> CSV
             </button>
             <button onClick={handleScrape} disabled={isScraping} className="btn btn-primary">
-              <PlayIcon className="w-4 h-4" /> {isScraping ? 'Scraping…' : 'Scrape'}
+              <PlayIcon className="w-4 h-4" aria-hidden="true" /> {isScraping ? 'Scraping…' : 'Scrape'}
             </button>
           </>
         }
@@ -129,10 +142,7 @@ export default function IOCs() {
               return (
                 <button
                   key={t.id}
-                  onClick={() => {
-                    setIocType(active ? '' : t.id);
-                    setPage(0);
-                  }}
+                  onClick={() => setFilter({ type: active ? null : t.id })}
                   className={`flex items-center gap-2.5 text-left px-2 py-1.5 rounded-md transition-colors ${active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'}`}
                 >
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: t.color }} />
@@ -150,31 +160,22 @@ export default function IOCs() {
         </Section>
 
         <div className="nw-panel p-3 flex flex-col xl:flex-row gap-2.5">
-          <label className="flex-1 flex items-center gap-2 nw-inset px-3 py-2 focus-within:border-brand/50">
-            <MagnifyingGlassIcon className="w-4 h-4 text-ink-500 flex-shrink-0" />
-            <input
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(0);
-              }}
-              placeholder="Search value, hash, CVE…"
-              className="bg-transparent outline-none text-[13px] w-full font-mono placeholder:font-sans placeholder:text-ink-500"
-            />
-            {search && (
-              <button onClick={() => setSearch('')} className="text-ink-500 hover:text-white" aria-label="Clear">
-                <XMarkIcon className="w-4 h-4" />
-              </button>
-            )}
-          </label>
+          <SearchInput
+            id="iocs-search"
+            label="Search IOCs by value, hash, or CVE"
+            value={search}
+            onChange={(v) => setFilter({ q: v })}
+            placeholder="Search value, hash, CVE…"
+            icon={<MagnifyingGlassIcon className="w-4 h-4 text-ink-500 flex-shrink-0" aria-hidden="true" />}
+          />
           <div className="flex gap-2">
-            <select value={iocType} onChange={(e) => { setIocType(e.target.value); setPage(0); }} className="input !w-auto" aria-label="Type">
+            <select value={iocType} onChange={(e) => setFilter({ type: e.target.value || null })} className="input !w-auto" aria-label="Type">
               <option value="">All types</option>
               {IOC_TYPES.map((t) => (
                 <option key={t.id} value={t.id}>{t.label}</option>
               ))}
             </select>
-            <select value={source} onChange={(e) => { setSource(e.target.value); setPage(0); }} className="input !w-auto max-w-[180px]" aria-label="Source">
+            <select value={source} onChange={(e) => setFilter({ source: e.target.value || null })} className="input !w-auto max-w-[180px]" aria-label="Source">
               <option value="">All sources</option>
               {(sourcesData?.names ?? []).map((n: string) => (
                 <option key={n} value={n}>{n}</option>
@@ -182,12 +183,7 @@ export default function IOCs() {
             </select>
             {(search || iocType || source) && (
               <button
-                onClick={() => {
-                  setSearch('');
-                  setIocType('');
-                  setSource('');
-                  setPage(0);
-                }}
+                onClick={() => setFilter({ q: null, type: null, source: null })}
                 className="btn btn-ghost text-[12.5px]"
               >
                 Clear
@@ -215,8 +211,10 @@ export default function IOCs() {
                 </tr>
               </thead>
               <tbody>
-                {data.iocs.map((ioc: any) => (
-                  <tr key={ioc.id} onClick={() => setSelected(ioc)} className="cursor-pointer group">
+                {data.iocs.map((ioc: any) => {
+                  const open = () => setSelected(ioc);
+                  return (
+                  <tr key={ioc.id} onClick={open} className="cursor-pointer group" {...rowKeyboardProps(open, `Open IOC ${ioc.value}`)}>
                     <td className="max-w-[420px]">
                       <code className="nw-mono text-ink-100 break-all">{ioc.value}</code>
                     </td>
@@ -245,28 +243,31 @@ export default function IOCs() {
                             e.stopPropagation();
                             copy(ioc.value);
                           }}
-                          className="p-1.5 rounded text-ink-500 opacity-0 group-hover:opacity-100 hover:text-brand hover:bg-brand/10"
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="p-1.5 rounded text-ink-500 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-brand hover:bg-brand/10"
                           title="Copy value"
+                          aria-label={`Copy ${ioc.value}`}
                         >
-                          <ClipboardDocumentIcon className="w-4 h-4" />
+                          <ClipboardDocumentIcon className="w-4 h-4" aria-hidden="true" />
                         </button>
                       </span>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-night-700">
-              <button disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="btn btn-secondary !py-1.5">
-                <ChevronLeftIcon className="w-4 h-4" /> Prev
+              <button disabled={page === 0} onClick={() => updateParams(pagePatch(Math.max(0, page - 1)))} className="btn btn-secondary !py-1.5">
+                <ChevronLeftIcon className="w-4 h-4" aria-hidden="true" /> Prev
               </button>
               <span className="font-mono text-[12px] text-ink-500 tabular-nums">
                 {page + 1} / {totalPages} · {(data?.total ?? 0).toLocaleString()} total
               </span>
-              <button disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)} className="btn btn-secondary !py-1.5">
-                Next <ChevronRightIcon className="w-4 h-4" />
+              <button disabled={page >= totalPages - 1} onClick={() => updateParams(pagePatch(page + 1))} className="btn btn-secondary !py-1.5">
+                Next <ChevronRightIcon className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
           )}
@@ -276,7 +277,7 @@ export default function IOCs() {
       {selected && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="IOC detail">
           <div className="absolute inset-0 bg-black/70" onClick={() => setSelected(null)} />
-          <aside className="absolute right-0 top-0 bottom-0 w-full max-w-[440px] bg-night-900 border-l border-night-700 flex flex-col animate-slide-up">
+          <aside id="ioc-drawer" tabIndex={-1} className="absolute right-0 top-0 bottom-0 w-full max-w-[440px] bg-night-900 border-l border-night-700 flex flex-col animate-fade-in overscroll-contain">
             <header className="px-5 py-4 border-b border-night-700 flex items-center justify-between">
               <div>
                 <p className="nw-eyebrow">IOC detail</p>
@@ -285,7 +286,7 @@ export default function IOCs() {
                 </p>
               </div>
               <button onClick={() => setSelected(null)} className="btn-ghost btn !px-2" aria-label="Close">
-                <XMarkIcon className="w-5 h-5" />
+                <XMarkIcon className="w-5 h-5" aria-hidden="true" />
               </button>
             </header>
             <div className="flex-1 overflow-y-auto scrollbar p-5 space-y-4">
@@ -293,8 +294,8 @@ export default function IOCs() {
                 <p className="nw-label">Value</p>
                 <div className="nw-inset p-3 flex items-start gap-2">
                   <code className="nw-mono break-all flex-1">{selected.value}</code>
-                  <button onClick={() => copy(selected.value)} className="btn btn-secondary !px-2 !py-1.5" title="Copy">
-                    <ClipboardDocumentIcon className="w-4 h-4" />
+                  <button onClick={() => copy(selected.value)} className="btn btn-secondary !px-2 !py-1.5" title="Copy" aria-label="Copy IOC value">
+                    <ClipboardDocumentIcon className="w-4 h-4" aria-hidden="true" />
                   </button>
                 </div>
               </div>

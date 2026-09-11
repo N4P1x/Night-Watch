@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
-import { PageHeader, EmptyState, SkeletonRows, SeverityPill } from '../components/ui';
+import { PageHeader, EmptyState, SkeletonRows, SeverityPill, SearchInput, rowKeyboardProps, useDrawerFocus } from '../components/ui';
+import { useQueryParams, pageFromParams, pagePatch } from '../utils/querystate';
 import { SEVERITY_ORDER, normalizeSeverity } from '../utils/severity';
 import {
   MagnifyingGlassIcon,
@@ -24,12 +24,17 @@ function stripHtml(html: string): string {
 }
 
 export default function Leaks() {
-  const [searchParams] = useSearchParams();
-  const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
-  const [severity, setSeverity] = useState('');
-  const [route, setRoute] = useState<'all' | 'onion' | 'clear'>('all');
-  const [sort, setSort] = useState<'date' | 'severity'>('date');
-  const [page, setPage] = useState(0);
+  // Filters + page live in the URL — views stay shareable and survive reload.
+  // One atomic update per gesture (see querystate docs).
+  const [params, updateParams] = useQueryParams();
+  const search = params.get('q') ?? '';
+  const severity = params.get('severity') ?? '';
+  const routeParam = params.get('route');
+  const routeValue = routeParam === 'onion' || routeParam === 'clear' ? routeParam : 'all';
+  const sortValue = params.get('sort') === 'severity' ? 'severity' : 'date';
+  const page = pageFromParams(params);
+  const setFilter = (patch: Record<string, string | null | undefined>) =>
+    updateParams({ ...patch, ...pagePatch(0) });
   const [selected, setSelected] = useState<any>(null);
   const [isScraping, setIsScraping] = useState(false);
   const queryClient = useQueryClient();
@@ -37,16 +42,21 @@ export default function Leaks() {
   const LIMIT = 20;
 
   useEffect(() => {
-    setSearch(searchParams.get('q') ?? '');
-    setPage(0);
-  }, [searchParams]);
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelected(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selected]);
+  useDrawerFocus(!!selected, 'leak-drawer');
 
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['leaks', search, severity, route, page],
+    queryKey: ['leaks', search, severity, routeValue, page],
     queryFn: async () => {
       const params: any = { search: search || undefined, skip: page * LIMIT, limit: LIMIT };
       if (severity) params.severity = severity;
-      if (route !== 'all') params.is_onion = route === 'onion';
+      if (routeValue !== 'all') params.is_onion = routeValue === 'onion';
       return (await api.get('/v1/leaks', { params })).data;
     },
     placeholderData: (prev) => prev,
@@ -54,14 +64,14 @@ export default function Leaks() {
 
   const rows = useMemo(() => {
     const list = [...(data?.leaks ?? [])];
-    if (sort === 'severity') {
+    if (sortValue === 'severity') {
       const rank = (s: string) => SEVERITY_ORDER.indexOf(normalizeSeverity(s));
       list.sort((a, b) => rank(a.severity) - rank(b.severity));
     } else {
       list.sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
     }
     return list;
-  }, [data, sort]);
+  }, [data, sortValue]);
 
   const totalPages = Math.max(1, Math.ceil((data?.total || 0) / LIMIT));
 
@@ -103,19 +113,18 @@ export default function Leaks() {
   return (
     <div className="min-h-full">
       <PageHeader
-        eyebrow="Intelligence · Breaches"
         title="Data leaks"
         description={<>{(data?.total ?? 0).toLocaleString()} leaks across surface and dark web · click a row for the full report.</>}
         actions={
           <>
             <button onClick={() => refetch()} disabled={isFetching} className="btn btn-secondary">
-              <ArrowPathIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
+              <ArrowPathIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} aria-hidden="true" /> Refresh
             </button>
             <button onClick={exportCSV} className="btn btn-secondary">
-              <ArrowDownTrayIcon className="w-4 h-4" /> Export
+              <ArrowDownTrayIcon className="w-4 h-4" aria-hidden="true" /> Export
             </button>
             <button onClick={scrape} disabled={isScraping} className="btn btn-primary">
-              <PlayIcon className="w-4 h-4" /> {isScraping ? 'Scanning…' : 'Deep scan'}
+              <PlayIcon className="w-4 h-4" aria-hidden="true" /> {isScraping ? 'Scanning…' : 'Deep scan'}
             </button>
           </>
         }
@@ -123,29 +132,20 @@ export default function Leaks() {
 
       <div className="px-6 py-5 space-y-4 max-w-[1440px]">
         <div className="nw-panel p-3 flex flex-col xl:flex-row gap-2.5 xl:items-center">
-          <label className="flex-1 flex items-center gap-2 nw-inset px-3 py-2 focus-within:border-brand/50">
-            <MagnifyingGlassIcon className="w-4 h-4 text-ink-500 flex-shrink-0" />
-            <input
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(0);
-              }}
-              placeholder="Search victims, titles, actors…"
-              className="bg-transparent outline-none text-[13px] w-full placeholder:text-ink-500"
-            />
-            {search && (
-              <button onClick={() => setSearch('')} aria-label="Clear" className="text-ink-500 hover:text-white">
-                <XMarkIcon className="w-4 h-4" />
-              </button>
-            )}
-          </label>
+          <SearchInput
+            id="leaks-search"
+            label="Search leaks by victim, title, or actor"
+            value={search}
+            onChange={(v) => setFilter({ q: v })}
+            placeholder="Search victims, titles, actors…"
+            icon={<MagnifyingGlassIcon className="w-4 h-4 text-ink-500 flex-shrink-0" aria-hidden="true" />}
+          />
           <div className="flex gap-1.5 flex-wrap">
-            <button onClick={() => { setSeverity(''); setPage(0); }} className={`nw-tab ${!severity ? 'nw-tab-active' : ''}`}>
+            <button onClick={() => setFilter({ severity: null })} className={`nw-tab ${!severity ? 'nw-tab-active' : ''}`}>
               All severities
             </button>
             {SEVERITY_ORDER.map((s) => (
-              <button key={s} onClick={() => { setSeverity(severity === s ? '' : s); setPage(0); }} className={`nw-tab capitalize ${severity === s ? 'nw-tab-active' : ''}`}>
+              <button key={s} onClick={() => setFilter({ severity: severity === s ? null : s })} className={`nw-tab capitalize ${severity === s ? 'nw-tab-active' : ''}`}>
                 {s}
               </button>
             ))}
@@ -153,13 +153,13 @@ export default function Leaks() {
           <span className="hidden xl:block w-px h-6 bg-night-700" />
           <div className="flex gap-1.5">
             {(['all', 'onion', 'clear'] as const).map((v) => (
-              <button key={v} onClick={() => { setRoute(v); setPage(0); }} className={`nw-tab ${route === v ? 'nw-tab-active' : ''}`}>
+              <button key={v} onClick={() => setFilter({ route: v === 'all' ? null : v })} className={`nw-tab ${routeValue === v ? 'nw-tab-active' : ''}`}>
                 {v === 'all' ? 'All routes' : v === 'onion' ? 'Tor' : 'Clearnet'}
               </button>
             ))}
-            <button onClick={() => setSort(sort === 'date' ? 'severity' : 'date')} className="nw-tab" title="Toggle sort">
+            <button onClick={() => setFilter({ sort: sortValue === 'date' ? 'severity' : null })} className="nw-tab" title="Toggle sort">
               <span className="inline-flex items-center gap-1.5">
-                <ArrowsUpDownIcon className="w-3.5 h-3.5" /> {sort === 'date' ? 'Newest' : 'Severity'}
+                <ArrowsUpDownIcon className="w-3.5 h-3.5" aria-hidden="true" /> {sortValue === 'date' ? 'Newest' : 'Severity'}
               </span>
             </button>
           </div>
@@ -186,8 +186,9 @@ export default function Leaks() {
               <tbody>
                 {rows.map((l: any) => {
                   const onion = String(l.source_url ?? '').includes('.onion');
+                  const open = () => setSelected(l);
                   return (
-                    <tr key={l.id} onClick={() => setSelected(l)} className="cursor-pointer">
+                    <tr key={l.id} onClick={open} className="cursor-pointer" {...rowKeyboardProps(open, `Open leak ${l.title}`)}>
                       <td>
                         <SeverityPill value={l.severity} />
                       </td>
@@ -208,24 +209,26 @@ export default function Leaks() {
               </tbody>
             </table>
           )}
-          <div className="flex items-center justify-between px-4 py-3 border-t border-night-700">
-            <button disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="btn btn-secondary !py-1.5">
-              <ChevronLeftIcon className="w-4 h-4" /> Prev
-            </button>
-            <span className="font-mono text-[12px] text-ink-500 tabular-nums">
-              {page + 1} / {totalPages} · {(data?.total ?? 0).toLocaleString()} total
-            </span>
-            <button disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)} className="btn btn-secondary !py-1.5">
-              Next <ChevronRightIcon className="w-4 h-4" />
-            </button>
-          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-night-700">
+              <button disabled={page === 0} onClick={() => updateParams(pagePatch(Math.max(0, page - 1)))} className="btn btn-secondary !py-1.5">
+                <ChevronLeftIcon className="w-4 h-4" aria-hidden="true" /> Prev
+              </button>
+              <span className="font-mono text-[12px] text-ink-500 tabular-nums">
+                {page + 1} / {totalPages} · {(data?.total ?? 0).toLocaleString()} total
+              </span>
+              <button disabled={page >= totalPages - 1} onClick={() => updateParams(pagePatch(page + 1))} className="btn btn-secondary !py-1.5">
+                Next <ChevronRightIcon className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       {selected && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Leak report">
           <div className="absolute inset-0 bg-black/70" onClick={() => setSelected(null)} />
-          <aside className="absolute right-0 top-0 bottom-0 w-full max-w-[560px] bg-night-900 border-l border-night-700 flex flex-col animate-slide-up">
+          <aside id="leak-drawer" tabIndex={-1} className="absolute right-0 top-0 bottom-0 w-full max-w-[560px] bg-night-900 border-l border-night-700 flex flex-col animate-fade-in overscroll-contain">
             <header className="px-5 py-4 border-b border-night-700">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -236,7 +239,7 @@ export default function Leaks() {
                   </span>
                 </div>
                 <button onClick={() => setSelected(null)} className="btn-ghost btn !px-2" aria-label="Close">
-                  <XMarkIcon className="w-5 h-5" />
+                  <XMarkIcon className="w-5 h-5" aria-hidden="true" />
                 </button>
               </div>
               <h2 className="text-[17px] font-semibold tracking-tight text-white mt-2">{selected.title}</h2>
@@ -267,8 +270,8 @@ export default function Leaks() {
                   <p className="nw-label">Source URL</p>
                   <div className="nw-inset p-3 flex items-start gap-2">
                     <code className="nw-mono break-all flex-1 select-all">{selected.source_url}</code>
-                    <button onClick={() => copy(selected.source_url)} className="btn btn-secondary !px-2 !py-1.5" title="Copy URL">
-                      <DocumentDuplicateIcon className="w-4 h-4" />
+                    <button onClick={() => copy(selected.source_url)} className="btn btn-secondary !px-2 !py-1.5" title="Copy URL" aria-label="Copy source URL">
+                      <DocumentDuplicateIcon className="w-4 h-4" aria-hidden="true" />
                     </button>
                   </div>
                 </div>

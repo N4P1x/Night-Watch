@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useQueryParams, pageFromParams, pagePatch } from '../utils/querystate';
 import { useToast } from '../components/Toast';
-import { PageHeader, Stat, EmptyState, SkeletonRows, SeverityPill } from '../components/ui';
+import { PageHeader, Stat, EmptyState, SkeletonRows, SeverityPill, ConfirmButton, SearchInput, rowKeyboardProps, useDrawerFocus } from '../components/ui';
 import {
   MagnifyingGlassIcon,
   XMarkIcon,
@@ -149,10 +150,14 @@ function csvCell(v: unknown) {
 }
 
 export default function ThreatActors() {
-  const [search, setSearch] = useState('');
-  const [risk, setRisk] = useState('');
-  const [active, setActive] = useState<'all' | 'active' | 'idle'>('all');
-  const [page, setPage] = useState(0);
+  const [params, updateParams] = useQueryParams();
+  const search = params.get('q') ?? '';
+  const risk = params.get('risk') ?? '';
+  const activeParam = params.get('status');
+  const activeValue = activeParam === 'active' || activeParam === 'idle' ? activeParam : 'all';
+  const page = pageFromParams(params);
+  const setFilter = (patch: Record<string, string | null | undefined>) =>
+    updateParams({ ...patch, ...pagePatch(0) });
   const [drawer, setDrawer] = useState<null | { mode: 'view'; actor: any } | { mode: 'add' } | { mode: 'edit'; actor: any }>(null);
   const [form, setForm] = useState<any>(EMPTY_FORM);
   const { showToast } = useToast();
@@ -171,11 +176,21 @@ export default function ThreatActors() {
       ).data,
   });
 
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDrawer(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawer]);
+  useDrawerFocus(!!drawer, 'actor-drawer');
+
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['threat-actors'] });
 
   const actors: any[] = (data?.actors ?? []).filter((a: any) => {
     if (risk && a.risk_level !== risk) return false;
-    if (active !== 'all' && Boolean(a.is_active) !== (active === 'active')) return false;
+    if (activeValue !== 'all' && Boolean(a.is_active) !== (activeValue === 'active')) return false;
     return true;
   });
 
@@ -201,7 +216,6 @@ export default function ThreatActors() {
   };
 
   const remove = async (actor: any) => {
-    if (!window.confirm(`Delete ${actor.name}?`)) return;
     try {
       await api.delete(`/v1/threat-actors/${actor.id}`);
       invalidate();
@@ -256,7 +270,6 @@ export default function ThreatActors() {
   return (
     <div className="min-h-full">
       <PageHeader
-        eyebrow="Intelligence · Actors"
         title="Threat actors"
         description={<>{stats.total.toLocaleString()} tracked groups · click a row for TTPs and tooling.</>}
         actions={
@@ -265,7 +278,7 @@ export default function ThreatActors() {
               Refresh
             </button>
             <button onClick={exportCSV} className="btn btn-secondary">
-              <ArrowDownTrayIcon className="w-4 h-4" /> Export
+              <ArrowDownTrayIcon className="w-4 h-4" aria-hidden="true" /> Export
             </button>
             {isAdmin && (
               <button onClick={seed} className="btn btn-secondary" title="Admin only">
@@ -279,7 +292,7 @@ export default function ThreatActors() {
               }}
               className="btn btn-primary"
             >
-              <PlusIcon className="w-4 h-4" /> Add actor
+              <PlusIcon className="w-4 h-4" aria-hidden="true" /> Add actor
             </button>
           </>
         }
@@ -288,36 +301,27 @@ export default function ThreatActors() {
       <div className="px-6 py-5 space-y-4 max-w-[1440px]">
         <div className="grid grid-cols-3 gap-4">
           <Stat label="Tracked" value={stats.total} />
-          <Stat label="Active" value={stats.active} accent="low" />
-          <Stat label="Critical" value={stats.critical} accent="critical" />
+          <Stat label="Active" value={stats.active} />
+          <Stat label="Critical" value={stats.critical} />
         </div>
 
         <div className="nw-panel p-3 flex flex-col md:flex-row gap-2.5 md:items-center">
-          <label className="flex-1 flex items-center gap-2 nw-inset px-3 py-2 focus-within:border-brand/50">
-            <MagnifyingGlassIcon className="w-4 h-4 text-ink-500" />
-            <input
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(0);
-              }}
-              placeholder="Search name or alias…"
-              className="bg-transparent outline-none text-[13px] w-full placeholder:text-ink-500"
-            />
-            {search && (
-              <button onClick={() => setSearch('')} aria-label="Clear" className="text-ink-500 hover:text-white">
-                <XMarkIcon className="w-4 h-4" />
-              </button>
-            )}
-          </label>
+          <SearchInput
+            id="actors-search"
+            label="Search actors by name or alias"
+            value={search}
+            onChange={(v) => setFilter({ q: v })}
+            placeholder="Search name or alias…"
+            icon={<MagnifyingGlassIcon className="w-4 h-4 text-ink-500 flex-shrink-0" aria-hidden="true" />}
+          />
           <div className="flex gap-1.5">
             {(['all', 'active', 'idle'] as const).map((v) => (
-              <button key={v} onClick={() => setActive(v)} className={`nw-tab capitalize ${active === v ? 'nw-tab-active' : ''}`}>
+              <button key={v} onClick={() => setFilter({ status: v === 'all' ? null : v })} className={`nw-tab capitalize ${activeValue === v ? 'nw-tab-active' : ''}`}>
                 {v}
               </button>
             ))}
           </div>
-          <select value={risk} onChange={(e) => setRisk(e.target.value)} className="input !w-auto" aria-label="Risk">
+          <select value={risk} onChange={(e) => setFilter({ risk: e.target.value || null })} className="input !w-auto" aria-label="Risk">
             <option value="">All risk</option>
             <option value="critical">Critical</option>
             <option value="high">High</option>
@@ -354,8 +358,10 @@ export default function ThreatActors() {
                 </tr>
               </thead>
               <tbody>
-                {actors.map((a: any) => (
-                  <tr key={a.id} onClick={() => setDrawer({ mode: 'view', actor: a })} className="cursor-pointer">
+                {actors.map((a: any) => {
+                  const open = () => setDrawer({ mode: 'view', actor: a });
+                  return (
+                  <tr key={a.id} onClick={open} className="cursor-pointer" {...rowKeyboardProps(open, `Open actor ${a.name}`)}>
                     <td className="max-w-[260px]">
                       <span className="block text-white font-medium truncate">{a.name}</span>
                       {!!a.aliases?.length && <span className="block text-[11.5px] text-ink-500 truncate">{a.aliases.slice(0, 3).join(' · ')}</span>}
@@ -381,38 +387,48 @@ export default function ThreatActors() {
                         }}
                         className="btn btn-ghost !px-2 !py-1.5"
                         title="Edit"
+                        aria-label={`Edit ${a.name}`}
                       >
-                        <PencilIcon className="w-4 h-4" />
+                        <PencilIcon className="w-4 h-4" aria-hidden="true" />
                       </button>
                       {isAdmin && (
-                        <button onClick={() => remove(a)} className="btn btn-ghost !px-2 !py-1.5 hover:!text-sev-critical" title="Delete (admin)">
-                          <TrashIcon className="w-4 h-4" />
-                        </button>
+                        <ConfirmButton
+                          onConfirm={() => remove(a)}
+                          label="Delete"
+                          armedLabel="Confirm?"
+                          title="Delete (admin)"
+                          className="btn btn-ghost !px-2 !py-1.5 hover:!text-sev-critical"
+                        >
+                          <TrashIcon className="w-4 h-4" aria-hidden="true" />
+                        </ConfirmButton>
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}
+          {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-night-700">
-            <button disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="btn btn-secondary !py-1.5">
-              <ChevronLeftIcon className="w-4 h-4" /> Prev
+            <button disabled={page === 0} onClick={() => updateParams(pagePatch(Math.max(0, page - 1)))} className="btn btn-secondary !py-1.5">
+              <ChevronLeftIcon className="w-4 h-4" aria-hidden="true" /> Prev
             </button>
             <span className="font-mono text-[12px] text-ink-500 tabular-nums">
               {page + 1} / {totalPages}
             </span>
-            <button disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)} className="btn btn-secondary !py-1.5">
-              Next <ChevronRightIcon className="w-4 h-4" />
+            <button disabled={page >= totalPages - 1} onClick={() => updateParams(pagePatch(page + 1))} className="btn btn-secondary !py-1.5">
+              Next <ChevronRightIcon className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
+          )}
         </div>
       </div>
 
       {drawer && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Actor detail">
           <div className="absolute inset-0 bg-black/70" onClick={() => setDrawer(null)} />
-          <aside className="absolute right-0 top-0 bottom-0 w-full max-w-[480px] bg-night-900 border-l border-night-700 flex flex-col animate-slide-up">
+          <aside id="actor-drawer" tabIndex={-1} className="absolute right-0 top-0 bottom-0 w-full max-w-[480px] bg-night-900 border-l border-night-700 flex flex-col animate-fade-in overscroll-contain">
             <header className="px-5 py-4 border-b border-night-700 flex items-center justify-between">
               <div>
                 <p className="nw-eyebrow">{drawer.mode === 'add' ? 'New actor' : drawer.mode === 'edit' ? 'Edit actor' : 'Actor profile'}</p>
@@ -421,7 +437,7 @@ export default function ThreatActors() {
                 </p>
               </div>
               <button onClick={() => setDrawer(null)} className="btn-ghost btn !px-2" aria-label="Close">
-                <XMarkIcon className="w-5 h-5" />
+                <XMarkIcon className="w-5 h-5" aria-hidden="true" />
               </button>
             </header>
 
@@ -506,12 +522,18 @@ function ActorProfile({ actor: a, isAdmin, onEdit, onToggle, onDelete }: any) {
           {a.is_active ? 'Deactivate' : 'Activate'}
         </button>
         <button onClick={onEdit} className="btn btn-secondary flex-1">
-          <PencilIcon className="w-4 h-4" /> Edit
+          <PencilIcon className="w-4 h-4" aria-hidden="true" /> Edit
         </button>
         {isAdmin && (
-          <button onClick={onDelete} className="btn btn-danger" title="Delete (admin)">
-            <TrashIcon className="w-4 h-4" />
-          </button>
+          <ConfirmButton
+            onConfirm={onDelete}
+            label="Delete"
+            armedLabel="Confirm?"
+            title="Delete (admin)"
+            className="btn btn-danger"
+          >
+            <TrashIcon className="w-4 h-4" aria-hidden="true" />
+          </ConfirmButton>
         )}
       </footer>
     </>
@@ -532,8 +554,9 @@ function ActorForm({ form, setForm, onCancel, onSave, mode }: any) {
     <>
       <div className="flex-1 overflow-y-auto scrollbar p-5 space-y-4">
         <div>
-          <label className="nw-label">Name *</label>
+          <label className="nw-label" htmlFor="actor-name">Name *</label>
           <input
+            id="actor-name"
             className="input font-mono disabled:opacity-60"
             value={form.name}
             onChange={(e) => set('name', e.target.value)}
@@ -543,13 +566,13 @@ function ActorForm({ form, setForm, onCancel, onSave, mode }: any) {
           {mode === 'edit' && <p className="nw-hint">Name is the identity key and cannot be renamed.</p>}
         </div>
         <div>
-          <label className="nw-label">Aliases (comma-separated)</label>
-          <input className="input" value={(form.aliases ?? []).join(', ')} onChange={(e) => arr('aliases', e.target.value)} />
+          <label className="nw-label" htmlFor="actor-aliases">Aliases (comma-separated)</label>
+          <input id="actor-aliases" className="input" value={(form.aliases ?? []).join(', ')} onChange={(e) => arr('aliases', e.target.value)} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="nw-label">Risk</label>
-            <select className="input" value={form.risk_level} onChange={(e) => set('risk_level', e.target.value)}>
+            <label className="nw-label" htmlFor="actor-risk">Risk</label>
+            <select id="actor-risk" className="input" value={form.risk_level} onChange={(e) => set('risk_level', e.target.value)}>
               <option value="critical">Critical</option>
               <option value="high">High</option>
               <option value="medium">Medium</option>
@@ -557,38 +580,38 @@ function ActorForm({ form, setForm, onCancel, onSave, mode }: any) {
             </select>
           </div>
           <div>
-            <label className="nw-label">Industries (comma-separated)</label>
-            <input className="input" value={(form.target_industries ?? []).join(', ')} onChange={(e) => arr('target_industries', e.target.value)} />
+            <label className="nw-label" htmlFor="actor-industries">Industries (comma-separated)</label>
+            <input id="actor-industries" className="input" value={(form.target_industries ?? []).join(', ')} onChange={(e) => arr('target_industries', e.target.value)} />
           </div>
         </div>
         <div>
-          <label className="nw-label">Description</label>
-          <textarea className="input min-h-[72px]" value={form.description} onChange={(e) => set('description', e.target.value)} />
+          <label className="nw-label" htmlFor="actor-desc">Description</label>
+          <textarea id="actor-desc" className="input min-h-[72px]" value={form.description} onChange={(e) => set('description', e.target.value)} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="nw-label">Languages (comma-separated)</label>
-            <input className="input" value={(form.primary_languages ?? []).join(', ')} onChange={(e) => arr('primary_languages', e.target.value)} />
+            <label className="nw-label" htmlFor="actor-lang">Languages (comma-separated)</label>
+            <input id="actor-lang" className="input" value={(form.primary_languages ?? []).join(', ')} onChange={(e) => arr('primary_languages', e.target.value)} />
           </div>
           <div>
-            <label className="nw-label">Motivation</label>
-            <input className="input" value={form.motivation} onChange={(e) => set('motivation', e.target.value)} />
+            <label className="nw-label" htmlFor="actor-motivation">Motivation</label>
+            <input id="actor-motivation" className="input" value={form.motivation} onChange={(e) => set('motivation', e.target.value)} />
           </div>
         </div>
         <div>
-          <label className="nw-label">TTPs (comma-separated MITRE IDs)</label>
-          <input className="input font-mono" value={(form.ttps ?? []).join(', ')} onChange={(e) => arr('ttps', e.target.value)} placeholder="T1486, T1490" />
+          <label className="nw-label" htmlFor="actor-ttps">TTPs (comma-separated MITRE IDs)</label>
+          <input id="actor-ttps" className="input font-mono" value={(form.ttps ?? []).join(', ')} onChange={(e) => arr('ttps', e.target.value)} placeholder="T1486, T1490" />
         </div>
         <div>
-          <label className="nw-label">Tools (comma-separated)</label>
-          <input className="input" value={(form.associated_tools ?? []).join(', ')} onChange={(e) => arr('associated_tools', e.target.value)} />
+          <label className="nw-label" htmlFor="actor-tools">Tools (comma-separated)</label>
+          <input id="actor-tools" className="input" value={(form.associated_tools ?? []).join(', ')} onChange={(e) => arr('associated_tools', e.target.value)} />
         </div>
         <div>
-          <label className="nw-label">Malware (comma-separated)</label>
-          <input className="input" value={(form.associated_malware ?? []).join(', ')} onChange={(e) => arr('associated_malware', e.target.value)} />
+          <label className="nw-label" htmlFor="actor-malware">Malware (comma-separated)</label>
+          <input id="actor-malware" className="input" value={(form.associated_malware ?? []).join(', ')} onChange={(e) => arr('associated_malware', e.target.value)} />
         </div>
         <label className="flex items-center gap-2 text-[13px] cursor-pointer">
-          <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} className="w-4 h-4 accent-[#F0A832]" />
+          <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} className="w-4 h-4 accent-[#5e6ad2]" />
           Active
         </label>
       </div>
