@@ -5,7 +5,6 @@ import { useWebSocket } from '../contexts/WebSocketContext';
 import { useQuery } from '@tanstack/react-query';
 import api from '../utils/api';
 import {
-  ShieldCheckIcon,
   HomeIcon,
   CircleStackIcon,
   UserGroupIcon,
@@ -63,6 +62,14 @@ function useClock() {
     return () => clearInterval(t);
   }, []);
   return now;
+}
+
+function BrandMark() {
+  return (
+    <span className="w-7 h-7 rounded-md bg-brand flex items-center justify-center flex-shrink-0" aria-hidden="true">
+      <span className="w-3.5 h-3.5 rounded-full border-[2.5px] border-white" />
+    </span>
+  );
 }
 
 export default function Layout() {
@@ -128,9 +135,7 @@ export default function Layout() {
   const sidebar = (
     <div className="flex flex-col h-full">
       <div className="h-14 flex items-center gap-2.5 px-4 border-b border-night-700 flex-shrink-0">
-        <span className="w-7 h-7 rounded-md bg-brand flex items-center justify-center flex-shrink-0">
-          <ShieldCheckIcon className="w-4.5 h-4.5 w-5 h-5 text-black" strokeWidth={2.25} />
-        </span>
+        <BrandMark />
         {!collapsed && (
           <span className="min-w-0">
             <span className="block text-[13px] font-bold tracking-[0.14em] text-white leading-4">NIGHT-WATCH</span>
@@ -139,7 +144,7 @@ export default function Layout() {
         )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto scrollbar px-2.5 py-3 space-y-4">
+      <nav className="flex-1 overflow-y-auto scrollbar px-2.5 py-3 space-y-4" aria-label="Primary">
         {NAV.map((group) => {
           const items = group.items.filter((i) => user && i.roles.includes(user.role));
           if (items.length === 0) return null;
@@ -154,15 +159,16 @@ export default function Layout() {
                       <Link
                         to={item.href}
                         title={collapsed ? item.name : undefined}
-                        className={`group relative flex items-center gap-2.5 px-2.5 py-2 rounded-md text-[13px] font-medium transition-colors ${
-                          active ? 'bg-white/[0.06] text-white' : 'text-ink-400 hover:text-white hover:bg-white/[0.04]'
+                        aria-current={active ? 'page' : undefined}
+                        className={`group relative flex items-center gap-2.5 px-2.5 py-2 rounded-md text-[13px] font-medium transition-colors duration-150 ${
+                          active ? 'bg-white/[0.06] text-white' : 'text-ink-500 hover:text-white hover:bg-white/[0.04]'
                         }`}
                       >
                         <span
                           className={`absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full ${active ? 'bg-brand' : 'bg-transparent'}`}
-                          aria-hidden
+                          aria-hidden="true"
                         />
-                        <item.icon className="w-[18px] h-[18px] flex-shrink-0" strokeWidth={1.75} />
+                        <item.icon className="w-[18px] h-[18px] flex-shrink-0" aria-hidden="true" />
                         {!collapsed && <span className="truncate">{item.name}</span>}
                         {!collapsed && item.name === 'Alerts' && unreadAlerts > 0 && (
                           <span className="ml-auto min-w-[20px] px-1.5 py-0.5 rounded text-[11px] font-bold text-center bg-sev-critical/15 text-sev-critical border border-sev-critical/30 tabular-nums">
@@ -183,13 +189,14 @@ export default function Layout() {
             {!collapsed && <p className="nw-eyebrow px-2 mb-1.5">System</p>}
             <Link
               to="/settings"
-              className={`flex items-center gap-2.5 px-2.5 py-2 rounded-md text-[13px] font-medium transition-colors ${
+              aria-current={location.pathname === '/settings' ? 'page' : undefined}
+              className={`flex items-center gap-2.5 px-2.5 py-2 rounded-md text-[13px] font-medium transition-colors duration-150 ${
                 location.pathname === '/settings'
                   ? 'bg-white/[0.06] text-white'
-                  : 'text-ink-400 hover:text-white hover:bg-white/[0.04]'
+                  : 'text-ink-500 hover:text-white hover:bg-white/[0.04]'
               }`}
             >
-              <Cog6ToothIcon className="w-[18px] h-[18px] flex-shrink-0" strokeWidth={1.75} />
+              <Cog6ToothIcon className="w-[18px] h-[18px] flex-shrink-0" aria-hidden="true" />
               {!collapsed && 'Settings'}
             </Link>
           </div>
@@ -198,7 +205,7 @@ export default function Layout() {
 
       <div className="border-t border-night-700 p-2.5 flex-shrink-0">
         <div className={`flex items-center gap-2.5 px-2 py-1.5 ${collapsed ? 'justify-center' : ''}`}>
-          <span className="w-7 h-7 rounded-full bg-night-700 border border-night-600 flex items-center justify-center text-[11px] font-bold text-ink-100 flex-shrink-0">
+          <span className="w-7 h-7 rounded-full bg-night-700 border border-night-600 flex items-center justify-center text-[11px] font-bold text-ink-100 flex-shrink-0" aria-hidden="true">
             {(user?.username ?? '?').slice(0, 1).toUpperCase()}
           </span>
           {!collapsed && (
@@ -210,14 +217,14 @@ export default function Layout() {
             </span>
           )}
           {!collapsed && (
-            <button onClick={logout} title="Sign out" className="p-1.5 rounded-md text-ink-500 hover:text-sev-critical hover:bg-sev-critical/10 transition-colors">
-              <ArrowRightOnRectangleIcon className="w-4 h-4" />
+            <button onClick={logout} title="Sign out" aria-label="Sign out" className="p-1.5 rounded-md text-ink-500 hover:text-sev-critical hover:bg-sev-critical/10 transition-colors duration-150">
+              <ArrowRightOnRectangleIcon className="w-4 h-4" aria-hidden="true" />
             </button>
           )}
         </div>
         {collapsed && (
-          <button onClick={logout} title="Sign out" className="mt-1 w-full flex justify-center p-1.5 rounded-md text-ink-500 hover:text-sev-critical hover:bg-sev-critical/10">
-            <ArrowRightOnRectangleIcon className="w-4 h-4" />
+          <button onClick={logout} title="Sign out" aria-label="Sign out" className="mt-1 w-full flex justify-center p-1.5 rounded-md text-ink-500 hover:text-sev-critical hover:bg-sev-critical/10">
+            <ArrowRightOnRectangleIcon className="w-4 h-4" aria-hidden="true" />
           </button>
         )}
       </div>
@@ -226,8 +233,11 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen flex bg-night-950">
+      <a href="#nw-main" className="nw-skip">
+        Skip to content
+      </a>
       {/* Desktop sidebar */}
-      <aside className={`hidden lg:flex flex-col flex-shrink-0 bg-night-900 border-r border-night-700 transition-all ${collapsed ? 'w-[60px]' : 'w-[248px]'}`}>
+      <aside className={`hidden lg:flex flex-col flex-shrink-0 bg-night-900 border-r border-night-700 transition-colors duration-150 ${collapsed ? 'w-[60px]' : 'w-[232px]'}`}>
         {sidebar}
       </aside>
 
@@ -235,10 +245,10 @@ export default function Layout() {
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/70" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-[280px] bg-night-900 border-r border-night-700 animate-slide-up">
+          <aside className="absolute left-0 top-0 bottom-0 w-[280px] bg-night-900 border-r border-night-700 animate-fade-in overscroll-contain" aria-label="Menu">
             <div className="flex justify-end p-2">
               <button onClick={() => setMobileOpen(false)} className="btn-ghost btn !px-2" aria-label="Close menu">
-                <XMarkIcon className="w-5 h-5" />
+                <XMarkIcon className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>
             <div className="h-[calc(100%-48px)]">{sidebar}</div>
@@ -250,28 +260,30 @@ export default function Layout() {
         {/* Top command bar */}
         <header className="h-14 flex items-center gap-3 px-4 border-b border-night-700 bg-night-900/80 backdrop-blur sticky top-0 z-40">
           <button onClick={() => setMobileOpen(true)} className="lg:hidden btn-ghost btn !px-2" aria-label="Open menu">
-            <Bars3Icon className="w-5 h-5" />
+            <Bars3Icon className="w-5 h-5" aria-hidden="true" />
           </button>
           <button
             onClick={() => setCollapsed((v) => !v)}
             className="hidden lg:inline-flex btn-ghost btn !px-2"
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            <Bars3Icon className="w-5 h-5" />
+            <Bars3Icon className="w-5 h-5" aria-hidden="true" />
           </button>
 
           <nav className="flex items-center gap-1.5 text-[12.5px] min-w-0" aria-label="Breadcrumb">
             <span className="text-ink-500">Night-Watch</span>
-            <ChevronRightIcon className="w-3.5 h-3.5 text-ink-500" />
+            <ChevronRightIcon className="w-3.5 h-3.5 text-ink-500" aria-hidden="true" />
             <span className="text-white font-semibold truncate">{crumb}</span>
           </nav>
 
           <div className="ml-auto flex items-center gap-2.5">
-            <label className="hidden md:flex items-center gap-2 nw-inset px-2.5 py-1.5 w-56 focus-within:border-brand/50">
-              <MagnifyingGlassIcon className="w-4 h-4 text-ink-500" />
+            <label className="hidden md:flex items-center gap-2 nw-inset px-2.5 py-1.5 w-56 focus-within:border-brand/50" htmlFor="nw-global-search">
+              <MagnifyingGlassIcon className="w-4 h-4 text-ink-500" aria-hidden="true" />
+              <span className="sr-only">Search leaks</span>
               <input
                 id="nw-global-search"
-                placeholder="Search leaks…  (⌘K)"
+                placeholder="Search leaks… (⌘K)"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') navigate(`/leaks?q=${encodeURIComponent((e.target as HTMLInputElement).value)}`);
                 }}
@@ -280,23 +292,24 @@ export default function Layout() {
             </label>
 
             <span className="hidden xl:inline font-mono text-[12px] text-ink-500 tabular-nums">
-              {now.toISOString().slice(11, 19)}Z
+              {new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'UTC' }).format(now)}Z
             </span>
 
             <span
               title={isConnected ? 'Live channel connected' : 'Live channel reconnecting'}
               className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-night-700 bg-night-950 text-[11.5px] font-semibold"
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-sev-low' : 'bg-sev-medium animate-pulse'}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-sev-low' : 'bg-sev-medium animate-pulse'}`} aria-hidden="true" />
               <span className={isConnected ? 'text-sev-low' : 'text-sev-medium'}>{isConnected ? 'LIVE' : 'RETRY'}</span>
             </span>
 
             <Link
               to="/alerts"
-              className="relative p-2 rounded-md text-ink-400 hover:text-white hover:bg-white/5"
+              className="relative p-2 rounded-md text-ink-500 hover:text-white hover:bg-white/5"
               title="Alerts"
+              aria-label={unreadAlerts > 0 ? `Alerts, ${unreadAlerts} unread` : 'Alerts'}
             >
-              <BellIcon className="w-[18px] h-[18px]" />
+              <BellIcon className="w-[18px] h-[18px]" aria-hidden="true" />
               {unreadAlerts > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 min-w-[16px] px-1 rounded-full bg-sev-critical text-white text-[10px] font-bold text-center tabular-nums">
                   {unreadAlerts > 99 ? '99+' : unreadAlerts}
@@ -308,13 +321,13 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="flex-1 min-w-0 overflow-auto scrollbar">
+        <main id="nw-main" className="flex-1 min-w-0 overflow-auto scrollbar">
           <Outlet />
         </main>
 
         <footer className="border-t border-night-700 px-4 py-2 flex items-center gap-3 text-[11px] font-mono text-ink-500">
           <span>NIGHT-WATCH v1.0</span>
-          <span aria-hidden>·</span>
+          <span aria-hidden="true">·</span>
           <span>{isConnected ? 'channel: live' : 'channel: retrying'}</span>
           <span className="ml-auto hidden sm:inline">G+D dashboard · G+L leaks · G+A actors · G+I iocs · ⌘K search</span>
         </footer>

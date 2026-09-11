@@ -1,4 +1,4 @@
-/** @type {import('tailwindcss').Config} */
+/** Night-Watch console tokens — see repo DESIGN.md. Do not invent new accents. */
 export default {
   content: [
     "./index.html",
@@ -7,46 +7,48 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Night-Watch SOC console — flat, dense, no gradients
+        // Linear-ladder surfaces on #010102 canvas. Hierarchy via lift + hairline.
         night: {
-          950: '#0B0E13', // app bg
-          900: '#11151C', // panel
-          850: '#161B24', // raised panel
-          800: '#1B2130', // hover / input
-          700: '#232B38', // border-strong / muted bg
-          600: '#2E3849', // border-strongest
+          950: '#010102', // canvas
+          900: '#0f1011', // panel / raised
+          850: '#141516', // wells, selected, hover fill
+          800: '#18191a', // deepest wells, table heads
+          700: '#23252a', // hairline
+          600: '#34343a', // hairline-strong
+          500: '#3e3e44', // hairline-tertiary
         },
         ink: {
-          100: '#E6EBF2', // primary text
-          400: '#8A94A6', // secondary
-          500: '#6B7688', // tertiary
+          100: '#f7f8f8',
+          400: '#d0d6e0',
+          500: '#8a8f98',
         },
+        // THE accent. Brand mark, primary CTA, focus ring, links. Nothing else.
         brand: {
-          DEFAULT: '#F0A832', // lantern amber — primary actions only
-          dim: '#8A6420',
+          DEFAULT: '#5e6ad2',
+          hover: '#828fff',
         },
         sev: {
-          critical: '#FF5C5C',
-          high: '#FF9F43',
-          medium: '#EACD3B',
-          low: '#3DDC97',
+          critical: '#f2555a',
+          high: '#ff9f43',
+          medium: '#e3b008',
+          low: '#3ddc97',
         },
-        // Back-compat aliases — old classes keep working, mapped to new palette
+        // Back-compat aliases for any stragglers during migration.
         dark: {
-          900: '#0B0E13',
-          800: '#11151C',
-          700: '#161B24',
-          600: '#232B38',
-          500: '#2E3849',
-          400: '#3A465C',
-          300: '#4A5872',
+          900: '#010102',
+          800: '#0f1011',
+          700: '#141516',
+          600: '#23252a',
+          500: '#34343a',
+          400: '#3e3e44',
+          300: '#4a4a52',
         },
         accent: {
-          primary: '#F0A832',
-          secondary: '#8A94A6',
-          success: '#3DDC97',
-          warning: '#EACD3B',
-          danger: '#FF5C5C',
+          primary: '#5e6ad2',
+          secondary: '#8a8f98',
+          success: '#3ddc97',
+          warning: '#e3b008',
+          danger: '#f2555a',
         },
       },
       fontFamily: {
@@ -56,13 +58,9 @@ export default {
       fontSize: {
         micro: ['11px', { lineHeight: '16px', letterSpacing: '0.08em' }],
       },
-      boxShadow: {
-        none: 'none',
-        panel: '0 1px 0 0 rgba(255,255,255,0.03) inset, 0 8px 24px -16px rgba(0,0,0,0.8)',
-      },
       borderRadius: {
-        md: '10px',
-        lg: '12px',
+        md: '8px', // buttons, inputs
+        lg: '12px', // panels, cards
       },
     },
   },
